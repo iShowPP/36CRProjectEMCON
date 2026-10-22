@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>EMCON</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    body { width: 380px; padding: 12px; }
+    .tabs { display: flex; gap: 4px; margin: 10px 0; }
+    .tabs button { flex: 1; padding: 6px 4px; font-size: 12px; }
+    .tabs button.on { background: var(--accent); color: #fff; border-color: transparent; }
+    .level { font-size: 18px; font-weight: 800; }
+    ul { margin: 6px 0; padding-left: 18px; }
+  </style>
+</head>
+<body>
+  <div class="row"><h1>🛡️ EMCON</h1><span class="muted small" id="host" style="margin-left:auto"></span></div>
+  <div class="tabs">
+    <button data-tab="site" class="on">This site</button>
+    <button data-tab="ghost">Ghost</button>
+    <button data-tab="trust">Trust</button>
+    <button data-tab="settings">Settings</button>
+  </div>
+
+  <section id="tab-site">
+    <div class="card" id="verdict"><span class="muted">No analysis for this tab yet. Reload the page.</span></div>
+    <div class="card">
+      <h2>Attest this site</h2>
+      <p class="small muted">This signs a credential with your own key. It only affects people who trust you.</p>
+      <div class="row">
+        <button id="attGood">👍 I transacted safely</button>
+        <button id="attScam" class="danger">🚩 Report scam</button>
+      </div>
+      <div id="attMsg" class="small"></div>
+    </div>
+  </section>
+
+  <section id="tab-ghost" class="hidden">
+    <div class="card" id="ghost"></div>
+  </section>
+
+  <section id="tab-trust" class="hidden">
+    <div class="card">
+      <h2>Your identity</h2>
+      <div class="mono" id="myDid"></div>
+      <button id="copyDid" style="margin-top:6px">Copy my DID</button>
+      <p class="small muted">Give this to friends so they can add you to their web of trust.</p>
+    </div>
+    <div class="card">
+      <h2>People &amp; groups you trust</h2>
+      <div id="roots" class="small"></div>
+      <label for="tDid">Add a person (did:key)</label><input id="tDid" placeholder="did:key:z6Mk…">
+      <div class="row">
+        <div style="flex:1"><label for="tLabel">Label</label><input id="tLabel" placeholder="e.g. Asha"></div>
+        <div style="width:90px"><label for="tWeight">Trust 0–1</label><input id="tWeight" type="number" min="0.05" max="1" step="0.05" value="0.7"></div>
+      </div>
+      <label class="row" style="color:var(--ink)"><input id="tPublish" type="checkbox" style="width:auto" checked> Publish a signed vouch (lets friends-of-friends benefit)</label>
+      <button id="tAdd" class="primary" style="margin-top:6px">Trust</button>
+      <div id="tMsg" class="small"></div>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <div class="toggle"><span>Anti-fingerprinting (all sites)</span><input type="checkbox" id="s_farble"></div>
+      <div class="toggle"><span>Turn off fingerprint protection on this site</span><input type="checkbox" id="s_exception"></div>
+      <div class="toggle"><span>Provenance badges on images</span><input type="checkbox" id="s_provenance"></div>
+      <div class="toggle"><span>Recover provenance of stripped images</span><input type="checkbox" id="s_provRecovery"></div>
+      <div class="toggle"><span>Phishing &amp; web-of-trust checks</span><input type="checkbox" id="s_wot"></div>
+      <label for="s_server">EMCON server</label><input id="s_server">
+      <p class="small muted">Changes apply on the next page load.</p>
+    </div>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

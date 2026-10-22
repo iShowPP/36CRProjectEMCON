@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMCON Demo Hub</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .shield h2 { display: flex; gap: 8px; align-items: center; }
+    .shield ul { padding-left: 18px; margin: 6px 0 12px; font-size: 14px; }
+    .fix { font-size: 13px; color: var(--muted); }
+    .fix b { color: var(--ink); }
+    ol.steps li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="chip">Hackathon build · no AI, just cryptography</span>
+    <h1>🛡️ EMCON: four shields, one extension</h1>
+    <p class="lead">Every check below is deterministic and anyone can verify it: blind signatures, Ed25519, W3C Verifiable Credentials, structural hashing, time-locks. Nothing depends on a probabilistic "AI detector" that attackers can learn to fool.</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <h2>Setup (2 minutes)</h2>
+      <ol class="steps">
+        <li>Server is running if you can read this. (<code>npm start</code>)</li>
+        <li>Chrome or Edge → <code>chrome://extensions</code> → enable <b>Developer mode</b> → <b>Load unpacked</b> → choose the <code>extension/</code> folder.</li>
+        <li>Click the 🛡️ toolbar icon → <b>Ghost</b> → <b>Set up Ghost</b>.</li>
+      </ol>
+      <div id="ext" class="small"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card shield">
+        <h2>👻 1 · Ghost Engine</h2>
+        <p class="small">Sign up anywhere as a verified human (and optionally 18+) without an email, phone or cross-site ID. A different, unlinkable pseudonym on every site.</p>
+        <div class="row"><a class="btn primary" href="/rp.html">Try ShopNorth sign-in</a><a class="btn" href="http://127.0.0.1:8787/rp.html">…as a "different company"</a></div>
+        <ul class="fix">
+          <li><b>Who vouches for "over 18"?</b> A self-made proof proves nothing. A one-time issuer attests it with <i>blind</i> RSA signatures, so it can't track where the tokens get spent.</li>
+          <li><b>Sybil farms:</b> single-use tokens and a monthly quota per verified human.</li>
+          <li><b>Issuer tagging users:</b> issuer keys are pinned and checked for consistency.</li>
+          <li><b>Phishing relay:</b> every sign-in is signed over the real origin (taken from Chrome, not the page).</li>
+          <li><b>Fingerprint "randomisation" makes you <i>more</i> unique.</b> Instead, noise is stable per site, high-entropy values are bucketed, and screen/locale are never faked.</li>
+        </ul>
+      </div>
+
+      <div class="card shield">
+        <h2>🖼️ 2 · Media provenance</h2>
+        <p class="small">Asks "who published this, and has it been changed?" rather than "is this AI?". Badges show up on any site.</p>
+        <div class="row"><a class="btn primary" href="/sign.html">Provenance studio</a><a class="btn" href="/feed.html">Social feed</a></div>
+        <ul class="fix">
+          <li><b>Platforms strip metadata:</b> a perceptual-hash registry recovers provenance, and the badge links to the original so you can compare.</li>
+          <li><b>"Unsigned = fake" is false and harmful.</b> Unsigned images get no badge. Only positive evidence or tampering is shown.</li>
+          <li><b>Copy a real signature onto an edited photo:</b> the hash covers the pixels, so the edit is caught as "Altered".</li>
+          <li><b>Anyone can sign:</b> only keys on the trust list count as "Verified".</li>
+        </ul>
+      </div>
+
+      <div class="card shield">
+        <h2>🏦 3 · Honey-Vault</h2>
+        <p class="small">Scam brakes for payments: risk-scaled cooling-off, scam-script check-in, guardians, duress PIN, panic freeze.</p>
+        <div class="row"><a class="btn primary" href="/vault.html">Open Kestrel Bank</a></div>
+        <ul class="fix">
+          <li><b>"Just wait 15 min" is easy to coach around.</b> The delay scales with risk, the release needs a check-in, and red flags go to guardians.</li>
+          <li><b>Thief switches off the protections first:</b> loosening a setting is time-locked and announced to guardians.</li>
+          <li><b>Duress PIN must not visibly fail:</b> the whole session becomes a consistent decoy.</li>
+          <li><b>On-chain duress leaks:</b> the Solidity vault covers the time-locks, and duress stays off-chain.</li>
+        </ul>
+      </div>
+
+      <div class="card shield">
+        <h2>🕸️ 4 · Web of Trust</h2>
+        <p class="small">Domains are rated by signed attestations from people and groups <i>you</i> trust, plus a structural check for brand clones.</p>
+        <div class="row"><a class="btn" href="/bank-login.html">Real bank login</a><a class="btn primary" href="http://127.0.0.1:8787/phish-login.html">Phishing clone</a></div>
+        <ul class="fix">
+          <li><b>Fake-review Sybils:</b> only identities reachable from your own trust roots count, and each root's branch is capped.</li>
+          <li><b>Lookups would leak your browsing:</b> the server only ever sees a 5-hex-char hash prefix (k-anonymity).</li>
+          <li><b>Compromised relay:</b> every credential is re-verified in your browser.</li>
+          <li><b>Generic login pages look alike:</b> a clone needs a structure match <i>and</i> a brand mention or credential form on a non-official domain.</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    import { $, hubNav, hasExtension } from '/common.js';
+    hubNav('/');
+    setTimeout(() => {
+      $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">✔ EMCON extension detected on this page</span>' : '<span class="chip warn">Extension not detected yet</span>';
+    }, 700);
+  </script>
+</body>
+</html>

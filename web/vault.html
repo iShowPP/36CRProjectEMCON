@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kestrel Bank Vault</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .balance { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+    .quiz { border: 1px dashed var(--warn); border-radius: 10px; padding: 12px; margin-top: 8px; }
+    .quiz .q { margin: 8px 0; font-size: 14px; }
+    .quiz .q label { display: inline; margin-right: 12px; color: var(--ink); }
+    .quiz .q input { width: auto; }
+    .reasons { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+    .alert-critical { color: var(--bad); } .alert-warning { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🏦 Kestrel Bank · Honey-Vault</h1>
+    <p class="lead">Online banking with built-in scam brakes: risk-scaled cooling-off, scam-script check-ins, guardian co-signing, a duress PIN, and time-locked settings.</p>
+
+    <section id="login" class="card stack" style="max-width:420px">
+      <h2>Log in</h2>
+      <div><label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" placeholder="••••"></div>
+      <button id="doLogin" class="primary">Log in</button>
+      <p class="small muted">Demo PINs: <b>1234</b> (real) · <b>9999</b> (duress: everything looks normal, but money is diverted and guardians are alerted)</p>
+      <div id="loginMsg" class="small"></div>
+    </section>
+
+    <section id="app" class="hidden">
+      <div id="banners" class="stack" style="margin-bottom:16px"></div>
+      <div class="grid">
+        <div class="card stack">
+          <div class="muted small">Available balance</div>
+          <div class="balance" id="balance">—</div>
+          <div id="freezeVault" class="small muted"></div>
+          <div class="row"><button id="freeze" class="danger">🧊 Panic freeze</button><button id="logout">Log out</button></div>
+        </div>
+        <div class="card stack">
+          <h2>Send money</h2>
+          <div><label for="payee">To</label><select id="payee"></select></div>
+          <div class="row">
+            <div style="flex:1"><label for="amount">Amount (USD)</label><input id="amount" type="number" min="1" step="0.01" value="250"></div>
+            <div style="flex:1"><label for="tpin">Confirm PIN</label><input id="tpin" type="password" inputmode="numeric"></div>
+          </div>
+          <div><label for="memo">Memo</label><input id="memo" placeholder="optional"></div>
+          <button id="send" class="primary">Send</button>
+          <div id="sendMsg" class="small"></div>
+        </div>
+      </div>
+
+      <div class="card stack" style="margin-top:16px">
+        <h2>Activity</h2>
+        <div id="txs"></div>
+      </div>
+
+      <div class="grid" style="margin-top:16px">
+        <div class="card stack">
+          <h2>Payees</h2>
+          <div id="payees" class="small"></div>
+          <details>
+            <summary class="small">Add payee</summary>
+            <div class="stack" style="margin-top:8px">
+              <input id="pname" placeholder="Name">
+              <input id="pacct" placeholder="Account number">
+              <input id="pdomain" placeholder="Their website (optional, checked against Web of Trust)">
+              <input id="ppin" type="password" placeholder="PIN">
+              <button id="addPayee">Add payee</button>
+              <div id="payeeMsg" class="small"></div>
+            </div>
+          </details>
+        </div>
+        <div class="card stack">
+          <h2>Protection settings</h2>
+          <p class="small muted">Making a protection <b>stricter</b> takes effect now. Making one <b>weaker</b> waits out the settings delay, and your guardians are told about it, so a thief who has your PIN can't switch the protections off first.</p>
+          <div id="settings" class="stack"></div>
+          <input id="spin" type="password" placeholder="PIN">
+          <button id="saveSettings">Save</button>
+          <div id="settingsMsg" class="small"></div>
+          <div id="pendingSettings" class="small"></div>
+        </div>
+      </div>
+
+      <div class="card stack" style="margin-top:16px">
+        <h2>Guardian alerts</h2>
+        <p class="small muted">Your guardians receive these (here, plus an optional webhook such as ntfy.sh/Pushover).</p>
+        <div id="alerts" class="small"></div>
+      </div>
+    </section>
+
+    <section class="card stack" style="margin-top:16px">
+      <h2>🎬 Demo controls</h2>
+      <div class="row">
+        <button data-ff="15">⏩ +15 min</button><button data-ff="60">⏩ +1 h</button><button data-ff="1500">⏩ +25 h</button>
+        <button id="reset">Reset vault</button>
+      </div>
+      <div id="guardianLinks" class="small"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { $, $$, esc, api, money, ago, until, hubNav } from '/common.js';
+    hubNav('/vault.html');
+    let token = sessionStorage.getItem('vaultToken');
+    let state;
+    const auth = () => ({ headers: { 'x-vault-session': token } });
+    const STATUS = {
+      completed: ['ok', 'Completed'], cooling: ['warn', 'Cooling-off'], awaiting_guardians: ['warn', 'Needs guardians'],
+      cancelled: ['', 'Cancelled'], vetoed: ['bad', 'Vetoed by guardian'], expired: ['', 'Expired'], diverted: ['bad', 'Diverted to freeze vault (duress)'], reversed: ['ok', 'Reversed (duress cleared)'],
+    };
+    const LABELS = { instantLimit: 'Instant limit ($)', guardianLimit: 'Guardian co-sign above ($)', coolingMinutes: 'Base cooling-off (min)', guardiansRequired: 'Guardians required', settingsDelayHours: 'Settings delay (h)', newPayeeHours: 'New-payee period (h)' };
+
+    async function refresh() {
+      if (!token) return show(false);
+      try { state = await api('/api/vault/state', auth()); } catch (e) { if (e.status === 401) { token = null; sessionStorage.removeItem('vaultToken'); return show(false); } throw e; }
+      show(true); render();
+    }
+    function show(loggedIn) { $('#login').classList.toggle('hidden', loggedIn); $('#app').classList.toggle('hidden', !loggedIn); }
+
+    function render() {
+      const s = state, clock = s.clock;
+      $('#balance').textContent = money(s.balance);
+      $('#freezeVault').textContent = s.freezeVault ? `🔒 ${money(s.freezeVault)} held in the freeze vault` : '';
+      const b = [];
+      if (s.frozen) b.push('<div class="notice bad">🧊 Account frozen. Outgoing transfers are halted. Only a guardian can unfreeze it.</div>');
+      if (s.duressActive) b.push('<div class="notice bad">🚨 A duress episode is active. Money sent from the decoy session is in the freeze vault. Guardians must close the episode to return it.</div>');
+      $('#banners').innerHTML = b.join('');
+      const picked = $('#payee').value;
+      $('#payee').innerHTML = s.payees.map((p) => `<option value="${p.id}">${esc(p.name)}${p.isNew ? ' (new)' : ''}</option>`).join('');
+      if (s.payees.some((p) => p.id === picked)) $('#payee').value = picked;
+      $('#payees').innerHTML = s.payees.map((p) => `<div>${esc(p.name)} <span class="muted mono">${esc(p.account)}</span> ${p.isNew ? '<span class="chip warn">new</span>' : ''} ${p.domain ? `<span class="chip">${esc(p.domain)}</span>` : ''}</div>`).join('');
+      $('#txs').innerHTML = s.txs.length ? s.txs.map((t) => txHtml(t, clock, s.quiz)).join('') : '<p class="muted small">No transactions yet.</p>';
+      if (!$('#settings').dataset.filled) {
+        $('#settings').innerHTML = Object.entries(LABELS).map(([k, l]) => `<div class="row"><label style="flex:1;margin:0" for="s_${k}">${l}</label><input id="s_${k}" data-k="${k}" type="number" style="width:110px" value="${s.settings[k]}"></div>`).join('');
+        $('#settings').dataset.filled = 1;
+      }
+      $('#pendingSettings').innerHTML = s.pendingSettings.map((p) => `<div class="notice warn" style="margin-top:6px">⏳ ${LABELS[p.key]}: ${p.from} → ${p.to}, effective in ${until(p.effectiveAt, clock)} <button data-cancel-setting="${p.id}">Cancel</button></div>`).join('');
+      $('#alerts').innerHTML = s.alerts.length ? s.alerts.map((a) => `<div class="alert-${a.level}">• <span class="muted">${ago(a.at, clock)}</span> ${esc(a.text)}</div>`).join('') : '<span class="muted">None.</span>';
+    }
+
+    function txHtml(t, clock, quiz) {
+      const [cls, label] = STATUS[t.status] || ['', t.status];
+      const open = ['cooling', 'awaiting_guardians'].includes(t.status);
+      let extra = '';
+      if (open) {
+        extra += `<div class="small muted">Releases in ${until(t.releaseAt, clock)}${t.needsGuardians ? ` · guardian approvals ${t.approvals}/${t.required}` : ''}${t.quiz ? ' · check-in done' : ' · <b>check-in required</b>'}</div>`;
+        if (!t.quiz) extra += `<div class="quiz" data-quiz="${t.id}"><b class="small">Quick safety check-in. Scammers often coach people through payments like this one.</b>${quiz.map((q) => `<div class="q">${esc(q.q)}<br><label><input type="radio" name="${t.id}_${q.id}" value="yes"> Yes</label><label><input type="radio" name="${t.id}_${q.id}" value="no"> No</label></div>`).join('')}<button data-submit-quiz="${t.id}">Submit</button></div>`;
+        else if (t.quiz.flags.length) extra += `<div class="notice warn small" style="margin-top:6px">⚠️ You answered yes to ${t.quiz.flags.length} warning sign(s). This matches a common scam script, so the payment now needs your guardians. <b>Real banks, police and tax offices never ask you to move money to "keep it safe".</b></div>`;
+        extra += `<div class="row" style="margin-top:6px"><button data-cancel="${t.id}">Cancel payment</button></div>`;
+      }
+      const reasons = t.risk?.reasons?.length ? `<ul class="reasons">${t.risk.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : '';
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div class="row"><b>${money(t.amount)}</b> → ${esc(t.payeeName)} <span class="chip ${cls}">${label}</span><span class="muted small">${ago(t.createdAt, clock)} · ref ${t.ref}</span></div>${reasons}${extra}</div>`;
+    }
+
+    $('#doLogin').onclick = async () => {
+      try { ({ token } = await api('/api/vault/login', { method: 'POST', body: { pin: $('#pin').value } })); sessionStorage.setItem('vaultToken', token); $('#pin').value = ''; $('#loginMsg').textContent = ''; refresh(); }
+      catch (e) { $('#loginMsg').textContent = '⚠️ ' + e.message; }
+    };
+    $('#pin').onkeydown = (e) => e.key === 'Enter' && $('#doLogin').click();
+    $('#logout').onclick = () => { token = null; sessionStorage.removeItem('vaultToken'); show(false); };
+
+    $('#send').onclick = async () => {
+      try {
+        const r = await api('/api/vault/transfer', { method: 'POST', ...auth(), body: { payeeId: $('#payee').value, amount: $('#amount').value, pin: $('#tpin').value, memo: $('#memo').value } });
+        $('#tpin').value = '';
+        const t = r.tx;
+        $('#sendMsg').innerHTML = t.status === 'completed' ? `✅ Sent. Reference ${t.ref}.`
+          : t.status === 'cooling' ? `⏳ Scheduled. To protect you, this payment has a ${until(t.releaseAt, state?.clock || Date.now())} cooling-off period. Complete the check-in below.`
+          : `🛡️ Held. This payment needs ${t.required} guardian approvals plus a cooling-off period. Complete the check-in below.`;
+        state = r.state; render();
+      } catch (e) { $('#sendMsg').textContent = '⚠️ ' + e.message; }
+    };
+
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('button'); if (!el) return;
+      try {
+        if (el.dataset.submitQuiz) {
+          const id = el.dataset.submitQuiz;
+          const answers = Object.fromEntries(state.quiz.map((q) => [q.id, document.querySelector(`input[name="${id}_${q.id}"]:checked`)?.value]));
+          state = await api(`/api/vault/tx/${id}/quiz`, { method: 'POST', ...auth(), body: { answers } }); render();
+        } else if (el.dataset.cancel) { state = await api(`/api/vault/tx/${el.dataset.cancel}/cancel`, { method: 'POST', ...auth() }); render(); }
+        else if (el.dataset.cancelSetting) { state = await api(`/api/vault/settings/${el.dataset.cancelSetting}/cancel`, { method: 'POST', ...auth() }); render(); }
+        else if (el.dataset.ff) { await api('/api/vault/demo/fast-forward', { method: 'POST', body: { minutes: +el.dataset.ff } }); refresh(); }
+      } catch (err) { alert(err.message); }
+    });
+
+    $('#freeze').onclick = async () => { state = await api('/api/vault/freeze', { method: 'POST', ...auth() }); render(); };
+    $('#addPayee').onclick = async () => {
+      try { state = await api('/api/vault/payees', { method: 'POST', ...auth(), body: { name: $('#pname').value, account: $('#pacct').value, domain: $('#pdomain').value, pin: $('#ppin').value } }); $('#payeeMsg').textContent = '✅ Added. New payees get extra protection for the first 24 h.'; $('#ppin').value = ''; render(); }
+      catch (e) { $('#payeeMsg').textContent = '⚠️ ' + e.message; }
+    };
+    $('#saveSettings').onclick = async () => {
+      const changes = Object.fromEntries($$('#settings input').map((i) => [i.dataset.k, i.value]));
+      try {
+        const r = await api('/api/vault/settings', { method: 'POST', ...auth(), body: { pin: $('#spin').value, changes } });
+        $('#spin').value = '';
+        $('#settingsMsg').innerHTML = [r.applied?.length ? `✅ Applied now: ${r.applied.join(', ')}` : '', r.delayed?.length ? `⏳ Time-locked: ${r.delayed.map((d) => d.key).join(', ')}` : ''].filter(Boolean).join('<br>') || 'No changes.';
+        state = r.state; $('#settings').dataset.filled = ''; render();
+      } catch (e) { $('#settingsMsg').textContent = '⚠️ ' + e.message; }
+    };
+    $('#reset').onclick = async () => { await api('/api/vault/demo/reset', { method: 'POST' }); token = null; sessionStorage.removeItem('vaultToken'); $('#settings').dataset.filled = ''; show(false); loadDemo(); };
+
+    async function loadDemo() {
+      const d = await api('/api/vault/demo/info');
+      $('#guardianLinks').innerHTML = 'Guardian consoles (open in another tab): ' + d.guardians.map((g) => `<a href="${g.url}" target="_blank">${esc(g.name)}</a>`).join(' · ');
+    }
+    loadDemo();
+    refresh();
+    setInterval(refresh, 4000);
+  </script>
+</body>
+</html>

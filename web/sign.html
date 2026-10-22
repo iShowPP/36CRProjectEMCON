@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provenance Studio</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    #preview { max-width: 100%; max-height: 320px; border-radius: 10px; border: 1px solid var(--line); display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Provenance Studio</h1>
+    <p class="lead">This plays the part of a newsroom's or camera's signing pipeline. It binds a signature to the image's pixels, plus a perceptual fingerprint, so provenance survives platforms that strip metadata. The extension then labels images wherever they show up.</p>
+
+    <div class="grid">
+      <div class="card stack">
+        <h2>1 · Pick an image</h2>
+        <input id="file" type="file" accept="image/png,image/jpeg">
+        <button id="sample">Or generate a sample photo</button>
+        <img id="preview" class="hidden" alt="">
+      </div>
+      <div class="card stack">
+        <h2>2 · Sign it</h2>
+        <div><label for="title">Caption / title</label><input id="title" value="Flooding closes the riverside highway"></div>
+        <div><label for="signer">Signing identity</label><select id="signer"></select></div>
+        <div class="row">
+          <button id="sign" class="primary" disabled>Sign &amp; download</button>
+          <button id="demo" disabled>Build the full demo feed</button>
+        </div>
+        <div id="out" class="small"></div>
+      </div>
+    </div>
+
+    <div class="card stack" style="margin-top:16px">
+      <h2>What "Build the full demo feed" posts</h2>
+      <table>
+        <tr><th>Post</th><th>How it's made</th><th>Badge you should see</th></tr>
+        <tr><td>Original</td><td>Signed by the trusted newsroom key</td><td><span class="chip ok">✔ Verified source</span></td></tr>
+        <tr><td>Doctored copy</td><td>Pixels edited, original manifest copied over</td><td><span class="chip bad">✖ Altered after signing</span></td></tr>
+        <tr><td>Re-upload</td><td>Re-encoded as JPEG, all metadata stripped (like social platforms do)</td><td><span class="chip ok">↺ Provenance recovered</span></td></tr>
+        <tr><td>Self-signed</td><td>Signed by a key that isn't on the trust list</td><td><span class="chip warn">? Signed, unknown signer</span></td></tr>
+        <tr><td>Unrelated image</td><td>Never signed</td><td>No badge. "No provenance" is <b>not</b> evidence of fake.</td></tr>
+      </table>
+      <p><a class="btn" href="/feed.html">Open the feed →</a></p>
+    </div>
+  </main>
+
+  <script type="module">
+    import { $, esc, api, hubNav } from '/common.js';
+    import { dhash } from '/lib/dhash.js';
+    import { toB64, fromB64 } from '/lib/util.js';
+    import { extractManifest, embedManifest } from '/lib/provenance.js';
+    hubNav('/sign.html');
+
+    let bytes = null;
+    const signers = await api('/api/prov/signers');
+    $('#signer').innerHTML = signers.map((s) => `<option value="${s.id}">${esc(s.name)} — ${s.trusted ? 'trusted' : 'NOT on trust list'}</option>`).join('');
+
+    const toBlob = (canvas, type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+    const blobBytes = async (b) => new Uint8Array(await b.arrayBuffer());
+    const bitmapOf = (b) => createImageBitmap(new Blob([b]));
+
+    function setImage(b) {
+      bytes = b;
+      $('#preview').src = URL.createObjectURL(new Blob([b]));
+      $('#preview').classList.remove('hidden');
+      $('#sign').disabled = $('#demo').disabled = false;
+    }
+
+    $('#file').onchange = async (e) => { const f = e.target.files[0]; if (f) setImage(await blobBytes(f)); };
+
+    function scene(w, h, seed) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      const sky = g.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, seed ? '#2b1055' : '#5aa9e6'); sky.addColorStop(1, seed ? '#d53369' : '#cfe8ff');
+      g.fillStyle = sky; g.fillRect(0, 0, w, h);
+      g.fillStyle = seed ? '#ffd166' : '#fff6c2'; g.beginPath(); g.arc(w * (seed ? 0.2 : 0.75), h * 0.28, h * 0.1, 0, 7); g.fill();
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle = ['#3d5a80', '#293241', '#1b263b'][i]; g.beginPath(); g.moveTo(0, h);
+        for (let x = 0; x <= w; x += 40) g.lineTo(x, h * (0.55 + i * 0.12) - Math.sin(x / (90 + i * 40) + i + seed) * h * 0.08);
+        g.lineTo(w, h); g.fill();
+      }
+      g.fillStyle = '#4ea8de'; g.fillRect(0, h * 0.86, w, h * 0.14);
+      return c;
+    }
+
+    $('#sample').onclick = async () => setImage(await blobBytes(await toBlob(scene(960, 600, 0), 'image/png')));
+
+    async function sign(b, signer, extra = {}) {
+      const bmp = await bitmapOf(b);
+      const h = await dhash(bmp);
+      return api('/api/prov/sign', { method: 'POST', body: { image: toB64(b), title: $('#title').value, signer, dhash: h, ...extra } });
+    }
+
+    $('#sign').onclick = async () => {
+      $('#out').textContent = 'Signing…';
+      try {
+        const r = await sign(bytes, $('#signer').value);
+        $('#out').innerHTML = `✅ Signed. <a href="${r.url}" download>Download signed file</a> · <a href="${r.url}" target="_blank">open</a><pre>${esc(JSON.stringify(r.manifest, null, 2))}</pre>`;
+      } catch (e) { $('#out').textContent = '⚠️ ' + e.message; }
+    };
+
+    $('#demo').onclick = async () => {
+      $('#demo').disabled = true;
+      $('#out').textContent = 'Building feed…';
+      try {
+        await api('/api/prov/feed', { method: 'DELETE' });
+        const caption = $('#title').value;
+        // 1. trusted original
+        const orig = await sign(bytes, 'newsroom', { addToFeed: true, caption, author: '@KestrelDaily' });
+        const signedBytes = await blobBytes(await (await fetch(orig.url)).blob());
+        const bmp = await bitmapOf(signedBytes);
+        const canvasOf = () => { const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return c; };
+
+        // 2. doctored: edit pixels, keep the original (now lying) manifest
+        const t = canvasOf(); const g = t.getContext('2d');
+        g.fillStyle = 'rgba(200,0,0,.85)'; g.fillRect(0, t.height * 0.04, t.width * 0.55, t.height * 0.13);
+        g.fillStyle = '#fff'; g.font = `bold ${Math.round(t.height * 0.07)}px sans-serif`; g.fillText('BRIDGE COLLAPSED', t.width * 0.03, t.height * 0.135);
+        const doctored = embedManifest(await blobBytes(await toBlob(t, 'image/png')), extractManifest(signedBytes).manifest);
+        await api('/api/prov/upload', { method: 'POST', body: { image: toB64(doctored), caption: 'BREAKING: bridge collapsed!! media hiding it', author: '@truthseeker_99', kind: 'tampered' } });
+
+        // 3. stripped re-upload: what platforms do (re-encode + drop metadata)
+        const stripped = await blobBytes(await toBlob(canvasOf(), 'image/jpeg', 0.82));
+        await api('/api/prov/upload', { method: 'POST', body: { image: toB64(stripped), caption: 'saw this on the news, stay safe everyone', author: '@neighbour_jo', kind: 'stripped' } });
+
+        // 4. self-signed by an untrusted key
+        const other = await blobBytes(await toBlob(scene(960, 600, 3), 'image/png'));
+        await sign(other, 'unknown', { addToFeed: true, caption: 'Sunset from my balcony (signed by me!)', author: '@anon_blog' });
+
+        // 5. unsigned, unrelated
+        const plain = scene(800, 500, 1.7); const pg = plain.getContext('2d'); pg.fillStyle = 'rgba(0,0,0,.25)'; pg.fillRect(0, 0, 800, 500);
+        await api('/api/prov/upload', { method: 'POST', body: { image: toB64(await blobBytes(await toBlob(plain, 'image/jpeg', 0.9))), caption: 'evening walk 🌄', author: '@sam', kind: 'unsigned' } });
+
+        $('#out').innerHTML = '✅ Feed built. <a href="/feed.html">Open the feed →</a>';
+      } catch (e) { $('#out').textContent = '⚠️ ' + e.message; }
+      $('#demo').disabled = false;
+    };
+  </script>
+</body>
+</html>

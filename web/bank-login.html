@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kestrel Bank — Sign in</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .kb-wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    .kb-card { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; box-shadow: var(--shadow); }
+    .kb-logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; margin-bottom: 18px; }
+    .kb-logo span.mark { width: 32px; height: 32px; border-radius: 8px; background: #0f4c81; display: inline-block; }
+    .kb-field { margin-bottom: 14px; }
+    .kb-foot { margin-top: 18px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="kb-wrap">
+    <div class="kb-card">
+      <div class="kb-logo"><span class="mark"></span> Kestrel Bank</div>
+      <h2>Sign in to online banking</h2>
+      <form action="/vault.html" method="get">
+        <div class="kb-field">
+          <label for="user">Customer ID</label>
+          <input id="user" name="user" type="text" autocomplete="username">
+        </div>
+        <div class="kb-field">
+          <label for="pass">Password</label>
+          <input id="pass" name="pass" type="password" autocomplete="current-password">
+        </div>
+        <div class="kb-field">
+          <label><input type="checkbox" name="remember" style="width:auto"> Remember this device</label>
+        </div>
+        <button class="primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
+      </form>
+      <div class="kb-foot">
+        <p><a href="#">Forgot your password?</a> · <a href="#">Register</a></p>
+        <p>Kestrel Bank will never ask for your PIN by phone or text.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

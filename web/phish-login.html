@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kestrel Bank | Secure Login Verification</title>
+  <!-- DEMO PHISHING CLONE. Classes, ids and copy were changed on purpose to show
+       that structural hashing still matches. Nothing typed here is stored. -->
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .x1 { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    .x2 { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+    .x3 { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; margin-bottom: 18px; }
+    .x3 span.m { width: 32px; height: 32px; border-radius: 8px; background: #0f4c81; display: inline-block; }
+    .x4 { margin-bottom: 14px; }
+    .x5 { margin-top: 18px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="x1">
+    <div class="x2">
+      <div class="x3"><span class="m"></span> Kestrel Bank</div>
+      <h2>Unusual activity — verify your account</h2>
+      <form action="/phish-caught.html" method="get">
+        <div class="x4">
+          <label for="u">Customer ID</label>
+          <input id="u" name="u" type="text">
+        </div>
+        <div class="x4">
+          <label for="p">Password</label>
+          <input id="p" name="p" type="password">
+        </div>
+        <div class="x4">
+          <label><input type="checkbox" name="r" style="width:auto"> Keep me signed in</label>
+        </div>
+        <button class="primary" type="submit" style="width:100%;justify-content:center">Verify now</button>
+      </form>
+      <div class="x5">
+        <p><a href="#">Need help?</a> · <a href="#">Contact us</a></p>
+        <p>Your account will be suspended in 24 hours if not verified.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

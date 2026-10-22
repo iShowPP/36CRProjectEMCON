@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chirper Feed</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .feed { max-width: 620px; margin: 0 auto; }
+    .post { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    .post .who { font-weight: 700; } .post .when { color: var(--muted); font-size: 13px; }
+    .post img { width: 100%; border-radius: 10px; margin-top: 10px; display: block; }
+  </style>
+</head>
+<body>
+  <main class="feed">
+    <h1>🐦 Chirper</h1>
+    <p class="lead">A pretend social feed. With the EMCON extension loaded, each image gets a provenance badge in its top-left corner; click a badge for details. Images with no provenance get no badge, because missing provenance doesn't mean an image is fake.</p>
+    <div id="posts"><p class="muted">Loading…</p></div>
+  </main>
+  <script type="module">
+    import { $, esc, api, ago, hubNav } from '/common.js';
+    hubNav('/feed.html');
+    const feed = await api('/api/prov/feed');
+    $('#posts').innerHTML = feed.length ? feed.map((p) => `
+      <article class="post">
+        <div><span class="who">${esc(p.author)}</span> <span class="when">· ${ago(p.at)}</span></div>
+        <div>${esc(p.caption)}</div>
+        <img src="${esc(p.url)}" alt="${esc(p.caption)}" loading="lazy">
+      </article>`).join('') : '<div class="notice">The feed is empty. Build it in the <a href="/sign.html">Provenance Studio</a>.</div>';
+  </script>
+</body>
+</html>

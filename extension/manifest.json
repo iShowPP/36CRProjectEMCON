@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "EMCON — Four Shields",
+  "version": "1.0.0",
+  "description": "Ghost identities, media provenance badges, web-of-trust phishing defence and anti-fingerprinting. No AI guesswork, just cryptography.",
+  "minimum_chrome_version": "137",
+  "permissions": ["storage", "scripting", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "pages/popup.html", "default_title": "EMCON" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

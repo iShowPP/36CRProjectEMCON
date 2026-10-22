@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopNorth — Sign in</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <p class="chip">Demo relying party · <span id="origin"></span></p>
+    <h1>🛒 ShopNorth</h1>
+    <p class="lead">Create an account in one tap. ShopNorth gets cryptographic proof that you're a real, verified human (and optionally 18+), but no email, no phone, no name, and no ID it could share with other sites.</p>
+
+    <div class="grid">
+      <div class="card stack">
+        <h2>Sign in with EMCON Ghost</h2>
+        <label><input id="over18" type="checkbox" style="width:auto"> Also prove I'm over 18 (unlocks the 18+ aisle)</label>
+        <button id="go" class="primary">👻 Continue with EMCON Ghost</button>
+        <div id="status" class="small muted"></div>
+        <div id="noext" class="notice warn hidden">EMCON extension not detected. Load <code>extension/</code> as an unpacked extension, then reload this page.</div>
+      </div>
+
+      <div class="card stack">
+        <h2>Compare: "Sign in with Big Tech"</h2>
+        <table>
+          <tr><th>Data</th><th>OAuth login</th><th>EMCON Ghost</th></tr>
+          <tr><td>Email</td><td>✅ shared</td><td>— never</td></tr>
+          <tr><td>Name / avatar</td><td>✅ shared</td><td>— never</td></tr>
+          <tr><td>Same ID on every site</td><td>✅ linkable</td><td>— unique per site</td></tr>
+          <tr><td>Provider sees every login</td><td>✅ yes</td><td>— offline; issuer is blind</td></tr>
+          <tr><td>Proves "real human"</td><td>❌ no</td><td>✅ blind token</td></tr>
+          <tr><td>Proves age</td><td>❌ no</td><td>✅ without birthdate</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div id="result" class="card stack hidden" style="margin-top:16px"></div>
+
+    <div class="card stack" style="margin-top:16px">
+      <h2>Try the unlinkability demo</h2>
+      <p class="small muted">Open this same page on a different origin, which plays the part of a different company: <a id="other" href="#"></a>. You get a completely different pseudonym, so the two sites can't link you even if they compare their databases.</p>
+      <h3>Accounts this site holds</h3>
+      <div id="accounts" class="small muted">—</div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { $, esc, api, hubNav, hasExtension } from '/common.js';
+    hubNav('/rp.html');
+    $('#origin').textContent = location.origin;
+    const other = location.hostname === 'localhost' ? location.href.replace('localhost', '127.0.0.1') : location.href.replace('127.0.0.1', 'localhost');
+    $('#other').href = other; $('#other').textContent = other;
+
+    setTimeout(() => { if (!hasExtension()) $('#noext').classList.remove('hidden'); }, 800);
+
+    function ghost(req) {
+      return new Promise((resolve, reject) => {
+        const id = crypto.randomUUID();
+        const timer = setTimeout(() => { removeEventListener('message', on); reject(new Error('timed out waiting for EMCON')); }, 180e3);
+        function on(e) {
+          if (e.source !== window || e.data?.type !== 'EMCON_GHOST_RESPONSE' || e.data.id !== id) return;
+          clearTimeout(timer); removeEventListener('message', on);
+          e.data.ok ? resolve(e.data.result) : reject(new Error(e.data.error));
+        }
+        addEventListener('message', on);
+        postMessage({ type: 'EMCON_GHOST_REQUEST', id, ...req }, location.origin);
+      });
+    }
+
+    async function signIn(forceToken = false) {
+      const { challenge } = await api('/api/rp/challenge');
+      const claims = ['human', ...($('#over18').checked ? ['over18'] : [])];
+      $('#status').textContent = 'Waiting for your approval in the EMCON window…';
+      const presentation = await ghost({ challenge, claims, forceToken });
+      try {
+        const res = await api('/api/rp/auth', { method: 'POST', body: { challenge, presentation } });
+        render(res, presentation);
+      } catch (e) {
+        if (e.status === 428 && !forceToken) return signIn(true); // site doesn't know us yet: spend a token
+        throw e;
+      }
+    }
+
+    function render(res, p) {
+      const a = res.account;
+      $('#status').textContent = '';
+      $('#result').classList.remove('hidden');
+      $('#result').innerHTML = `
+        <h2>${res.newAccount ? '🎉 Account created' : '👋 Welcome back'}, ${esc(a.handle)}</h2>
+        <p class="small muted">Logins: ${a.logins} · Claims proven: ${a.claims.map((c) => `<span class="chip ok">${esc(c)}</span>`).join(' ')}
+        ${a.claims.includes('over18') ? ' · 🔓 18+ aisle unlocked' : ''}</p>
+        <h3>Everything ShopNorth now knows about you</h3>
+        <pre>${esc(JSON.stringify(res.whatThisSiteKnows, null, 2))}</pre>
+        <details><summary class="small">Raw presentation from the extension</summary><pre>${esc(JSON.stringify(p, null, 2))}</pre></details>`;
+      loadAccounts();
+    }
+
+    async function loadAccounts() {
+      const { accounts } = await api('/api/rp/accounts');
+      $('#accounts').innerHTML = accounts.length ? accounts.map((a) => `<div><code>${esc(a.handle)}</code> · ${a.claims.join(', ')} · ${a.logins} login(s)</div>`).join('') : 'none yet';
+    }
+
+    $('#go').onclick = async () => {
+      $('#go').disabled = true;
+      try { await signIn(); } catch (e) { $('#status').textContent = '⚠️ ' + e.message; } finally { $('#go').disabled = false; }
+    };
+    loadAccounts();
+  </script>
+</body>
+</html>
