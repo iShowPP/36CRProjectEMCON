@@ -395,6 +395,7 @@ await test('a real C2PA file (c2pa-rs sample) is recognised and its signer detai
 const side = http.createServer((req, res) => {
   if (req.url === '/go') { res.writeHead(301, { location: '/meta' }); return res.end(); }
   res.setHeader('content-type', 'text/html');
+  if (req.url === '/amp') return res.end('<meta http-equiv="refresh" content="0; url=/end?a=1&amp;b=2">');
   res.end(req.url === '/meta' ? '<meta http-equiv="refresh" content="0; url=/end"><p>loading</p>' : '<h1>landing page</h1>');
 });
 await new Promise((r) => side.listen(0, '127.0.0.1', r));
@@ -405,6 +406,7 @@ await test('link check follows HTTP and <meta refresh> redirects to where the li
   assert.deepEqual(r.hops.map((h) => [new URL(h.url).pathname, h.status, h.leaves || null]), [['/go', 301, 'redirect'], ['/meta', 200, 'page redirect'], ['/end', 200, null]]);
   assert.equal(r.final, SIDE + '/end');
   assert.equal(r.complete, true);
+  assert.equal((await expand(SIDE + '/amp')).final, SIDE + '/end?a=1&b=2', 'HTML entities in a meta refresh are decoded (wa.me)');
   assert.equal(new URL((await expand(BASE + '/s/qk50')).final).pathname, '/claim.html');
   assert.equal((await expand('ftp://example.com/x')).status, 400);
   assert.equal((await expand('not a link')).status, 400);

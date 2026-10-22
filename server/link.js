@@ -46,7 +46,8 @@ async function metaRefresh(res) {
   }
   reader.cancel().catch(() => {});
   const m = /<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["']?\s*\d+\s*;\s*url\s*=\s*['"]?([^"'>\s]+)/i.exec(html);
-  return m ? m[1] : null;
+  // the URL sits in an HTML attribute: decode its entities (wa.me writes &amp;, which otherwise loops)
+  return m ? m[1].replace(/&(amp|#38|#x26);/gi, '&').replace(/&(quot|#34);/gi, '"').replace(/&#39;/g, "'") : null;
 }
 
 export default async function link(route) {
