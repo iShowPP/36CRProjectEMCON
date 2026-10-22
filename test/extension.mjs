@@ -9,6 +9,8 @@ import { launchBrowser, waitFor, sleep } from '../tools/browser.mjs';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'emcon-browser-test-'));
 process.env.EMCON_DATA = path.join(TMP, 'data');
+// Stand-in for the live OpenPhish feed; *.test hostnames are mapped to this machine below.
+process.env.EMCON_FEED_URL = 'data:text/plain,' + encodeURIComponent('https://live-scam-shop.test/login\n');
 const { createApp } = await import('../server/app.js');
 const server = await createApp();
 await new Promise((r) => server.listen(0, r));
@@ -16,7 +18,10 @@ const PORT = server.address().port;
 const L = `http://localhost:${PORT}`;   // "official" origin
 const IP = `http://127.0.0.1:${PORT}`;  // plays a different company / the phishing host
 
-const browser = await launchBrowser({ profile: path.join(TMP, 'profile'), headless: !process.env.HEADED, fresh: true });
+const browser = await launchBrowser({
+  profile: path.join(TMP, 'profile'), headless: !process.env.HEADED, fresh: true,
+  extraArgs: ['--host-resolver-rules=MAP *.test 127.0.0.1'], // real-looking hostnames, served by the local test server
+});
 console.log(`\n  browser: ${browser.exe}\n  extension id: ${browser.extensionId}\n  server: ${L}`);
 
 let passed = 0, failed = 0;
@@ -189,6 +194,18 @@ await test('the real bank login on its official domain gets no warning', async (
   const ui = await extensionUi(p);
   assert.equal(ui.wall, null);
   assert.equal(ui.bar, null);
+});
+await test('a site listed in the live phishing feed is blocked', async () => {
+  const p = await browser.open(`http://live-scam-shop.test:${PORT}/feed.html`);
+  const ui = await waitFor(async () => (await extensionUi(p)).wall && (await extensionUi(p)), { timeout: 20000, what: 'block page' });
+  assert.match(ui.wall, /scam by 1 source/);
+});
+await test('a look-alike address (paypa1) gets a warning', async () => {
+  const p = await browser.open(`http://paypa1-secure.test:${PORT}/rp.html`);
+  const ui = await waitFor(async () => (await extensionUi(p)).bar && (await extensionUi(p)), { timeout: 20000, what: 'warning bar' });
+  console.log('      ' + ui.bar.replace(/\s+/g, ' ').slice(0, 160));
+  assert.match(ui.bar, /look-alike characters \("paypa1"\)/);
+  assert.match(ui.bar, /not an official PayPal domain/);
 });
 await test('you can publish your own signed attestation and DID', async () => {
   const me = await ext({ type: 'wot:me' });

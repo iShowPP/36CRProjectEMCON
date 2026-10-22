@@ -22,8 +22,8 @@
     <div class="card" style="margin-bottom:16px">
       <h2>Setup (2 minutes)</h2>
       <ol class="steps">
-        <li>Server is running if you can read this. (<code>npm start</code>)</li>
-        <li>Chrome or Edge → <code>chrome://extensions</code> → enable <b>Developer mode</b> → <b>Load unpacked</b> → choose the <code>extension/</code> folder.</li>
+        <li>Install the extension in Chrome, Edge or Brave: <code>chrome://extensions</code> → <b>Developer mode</b> → <b>Load unpacked</b> → the <code>emcon-extension</code> folder (from the release zip, or <code>extension/</code> in the repo).</li>
+        <li>On the welcome page that opens, set the EMCON server to <code id="here"></code> and click <b>Save &amp; check</b>.</li>
         <li>Click the 🛡️ toolbar icon → <b>Ghost</b> → <b>Set up Ghost</b>.</li>
       </ol>
       <div id="ext" class="small"></div>
@@ -33,7 +33,7 @@
       <div class="card shield">
         <h2>👻 1 · Ghost Engine</h2>
         <p class="small">Sign up anywhere as a verified human (and optionally 18+) without an email, phone or cross-site ID. A different, unlinkable pseudonym on every site.</p>
-        <div class="row"><a class="btn primary" href="/rp.html">Try ShopNorth sign-in</a><a class="btn" href="http://127.0.0.1:8787/rp.html">…as a "different company"</a></div>
+        <div class="row"><a class="btn primary" href="/rp.html">Try ShopNorth sign-in</a><a class="btn" data-alt="/rp.html" href="#">…as a "different company"</a></div>
         <ul class="fix">
           <li><b>Who vouches for "over 18"?</b> A self-made proof proves nothing. A one-time issuer attests it with <i>blind</i> RSA signatures, so it can't track where the tokens get spent.</li>
           <li><b>Sybil farms:</b> single-use tokens and a monthly quota per verified human.</li>
@@ -70,7 +70,7 @@
       <div class="card shield">
         <h2>🕸️ 4 · Web of Trust</h2>
         <p class="small">Domains are rated by signed attestations from people and groups <i>you</i> trust, plus a structural check for brand clones.</p>
-        <div class="row"><a class="btn" href="/bank-login.html">Real bank login</a><a class="btn primary" href="http://127.0.0.1:8787/phish-login.html">Phishing clone</a></div>
+        <div class="row"><a class="btn" href="/bank-login.html">Real bank login</a><a class="btn primary" data-alt="/phish-login.html" href="#">Phishing clone</a></div>
         <ul class="fix">
           <li><b>Fake-review Sybils:</b> only identities reachable from your own trust roots count, and each root's branch is capped.</li>
           <li><b>Lookups would leak your browsing:</b> the server only ever sees a 5-hex-char hash prefix (k-anonymity).</li>
@@ -79,13 +79,44 @@
         </ul>
       </div>
     </div>
+
+    <div class="card stack" style="margin-top:16px">
+      <h2>🌍 Try it on real websites</h2>
+      <p class="small">EMCON isn't limited to these demo pages. With the extension installed, it works on the whole web:</p>
+      <ul class="fix">
+        <li><b>Live phishing sites:</b> EMCON follows the OpenPhish community feed. Right now it knows <b id="feedCount">…</b> active phishing sites (updated <span id="feedWhen">…</span>). Some currently listed addresses:
+          <div id="feedSample" class="mono small" style="margin:6px 0"></div>
+          <span class="small" style="color:var(--bad)">⚠️ These are real scam sites. Only open one in a browser with EMCON installed, and never type anything into it. EMCON should block it straight away.</span></li>
+        <li><b>Look-alike addresses:</b> sites like <code>paypa1-secure.com</code> or <code>hdfcbank-kyc.top</code> get flagged because they borrow a real brand's name (PayPal, Google, Microsoft, Apple, Amazon, SBI, HDFC, ICICI and more) without being its official domain.</li>
+        <li><b>Brand-new domains:</b> registration dates come from the public RDAP registry. A login page on a domain registered this week is a red flag.</li>
+        <li><b>Anti-fingerprinting:</b> open <a href="https://browserleaks.com/canvas" target="_blank" rel="noopener">browserleaks.com/canvas</a>. Your canvas signature stays the same on that site but differs on every other site, so trackers can't follow you.</li>
+        <li><b>Content Credentials:</b> real photos carrying C2PA credentials (Adobe, Leica, Nikon, LinkedIn…) get an ⓘ badge wherever they appear.</li>
+      </ul>
+    </div>
   </main>
   <script type="module">
-    import { $, hubNav, hasExtension } from '/common.js';
+    import { $, $$, esc, api, ago, hubNav, hasExtension } from '/common.js';
     hubNav('/');
     setTimeout(() => {
       $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">✔ EMCON extension detected on this page</span>' : '<span class="chip warn">Extension not detected yet</span>';
     }, 700);
+
+    const cfg = await api('/api/config');
+    $('#here').textContent = cfg.official;
+    for (const a of $$('[data-alt]')) {
+      if (cfg.alt) a.href = cfg.alt + a.dataset.alt;
+      else a.remove(); // a single public hostname can't play two different websites
+    }
+
+    const feed = await api('/api/wot/feed?limit=6').catch(() => null);
+    if (feed?.count) {
+      $('#feedCount').textContent = feed.count;
+      $('#feedWhen').textContent = feed.updated ? ago(Date.parse(feed.updated)) : 'recently';
+      $('#feedSample').innerHTML = feed.sample.map((h) => `<div>${esc(h.replace(/\./g, '[.]'))}</div>`).join('');
+    } else {
+      $('#feedCount').textContent = feed?.enabled === false ? 'no (feed disabled on this server)' : '0 (feed not loaded yet)';
+      $('#feedWhen').textContent = '—';
+    }
   </script>
 </body>
 </html>

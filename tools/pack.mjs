@@ -43,8 +43,18 @@ function zip(entries) {
   return Buffer.concat([...locals, cdBuf, end]);
 }
 
+// --server=https://your-emcon.example bakes the hosted server in as the default.
+const server = process.argv.find((a) => a.startsWith('--server='))?.slice('--server='.length).replace(/\/+$/, '');
+if (server && !/^https?:\/\/[^/]+$/.test(server)) throw new Error(`--server must look like https://host, got "${server}"`);
+
 const files = walk(EXTENSION_DIR).sort();
-const entries = files.map((f) => ({ name: `${FOLDER}/${path.relative(EXTENSION_DIR, f).split(path.sep).join('/')}`, data: fs.readFileSync(f) }));
+const entries = files.map((f) => {
+  const rel = path.relative(EXTENSION_DIR, f).split(path.sep).join('/');
+  let data = fs.readFileSync(f);
+  if (server && rel === 'config.js') data = Buffer.from(data.toString('utf8').replace(/DEFAULT_SERVER = '[^']*'/, `DEFAULT_SERVER = '${server}'`));
+  return { name: `${FOLDER}/${rel}`, data };
+});
+if (server) console.log(`Default server baked in: ${server}`);
 const out = path.join(ROOT, 'dist', `emcon-extension-v${manifest.version}.zip`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, zip(entries));

@@ -29,20 +29,25 @@ const CANDIDATES = {
   linux: ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/microsoft-edge'],
 };
 
-export function findBrowser() {
+const NAME_HINT = { chrome: /chrome/i, edge: /edge/i, brave: /brave/i };
+
+// prefer: 'chrome' | 'edge' | 'brave' (optional). EMCON_BROWSER (a path) always wins.
+export function findBrowser(prefer) {
   if (process.env.EMCON_BROWSER) return process.env.EMCON_BROWSER;
-  const list = (CANDIDATES[process.platform] || CANDIDATES.linux).map((p) => p.replace(/%([^%]+)%/g, (_, v) => process.env[v] || ''));
+  const list = (CANDIDATES[process.platform] || CANDIDATES.linux)
+    .map((p) => p.replace(/%([^%]+)%/g, (_, v) => process.env[v] || ''))
+    .filter((p) => !prefer || NAME_HINT[prefer]?.test(p));
   const hit = list.find((p) => p && fs.existsSync(p));
-  if (!hit) throw new Error('No Chrome/Edge/Brave found. Set EMCON_BROWSER to the browser executable.');
+  if (!hit) throw new Error(`No ${prefer || 'Chrome/Edge/Brave'} installation found. Set EMCON_BROWSER to the browser executable.`);
   return hit;
 }
 
-export async function launchBrowser({ profile, headless = false, exe = findBrowser(), startUrl = 'about:blank', fresh = false } = {}) {
+export async function launchBrowser({ profile, headless = false, exe = findBrowser(), startUrl = 'about:blank', fresh = false, extraArgs = [] } = {}) {
   if (fresh) fs.rmSync(profile, { recursive: true, force: true });
   fs.mkdirSync(profile, { recursive: true });
   const args = [
     `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--enable-unsafe-extension-debugging',
-    '--no-first-run', '--no-default-browser-check', ...(headless ? ['--headless=new'] : []), startUrl,
+    '--no-first-run', '--no-default-browser-check', ...(headless ? ['--headless=new'] : []), ...extraArgs, startUrl,
   ];
   const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
   const toBrowser = proc.stdio[3], fromBrowser = proc.stdio[4];

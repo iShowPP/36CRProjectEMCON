@@ -24,9 +24,46 @@ EMCON is a browser extension for **Chrome, Edge and Brave** (version 137+).
 
 What works where:
 - **No server needed:** anti-fingerprinting and image signature checks start working straight away.
-- **Needs an EMCON server:** Ghost sign-in, scam reports, and recovering provenance for stripped images. The server is the `server/` folder (`npm start`); host it anywhere that runs Node 22.
+- **Needs an EMCON server:** Ghost sign-in, scam and phishing reports (including the live feed), and recovering provenance for stripped images. See *Host the server* below.
 
 The same zip is what you'd upload to the Chrome Web Store.
+
+## Works on real websites
+
+EMCON protects the whole web, not just the demo pages:
+
+| On real sites | How |
+|---|---|
+| **Live phishing sites are blocked** | The server imports the [OpenPhish](https://openphish.com) community feed every 6 hours (≈250–300 live phishing sites) and signs each entry as an attestation. The extension follows the feed by default (you can remove it like any other source). Shared hosts such as `sites.google.com` and brands' own domains are never flagged. |
+| **Look-alike addresses are flagged** | `paypa1-secure.com`, `micros0ft-login.net`, `hdfcbank-kyc.top`: the hostname borrows a real brand (PayPal, Google, Microsoft, Apple, Amazon, Meta, SBI, HDFC, ICICI, Axis, Paytm and more), with digit-for-letter swaps and one-letter typos undone, without being that brand's official domain. RBI's verified `.bank.in` zone counts as official for Indian banks. |
+| **Brand-new domains** | Registration dates come from the public RDAP registry. |
+| **Anti-fingerprinting** | Works everywhere. Try [browserleaks.com/canvas](https://browserleaks.com/canvas). |
+| **Real Content Credentials** | Photos carrying C2PA manifests get an ⓘ badge on any site. |
+
+Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, SBI): none of them triggers a warning.
+
+## Host the server
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/iShowPP/36CRProjectEMCON)
+
+1. Click the button, sign in to Render (free), and click **Apply**. `render.yaml` sets everything up, including a generated `EMCON_SECRET`.
+2. After about a minute you have `https://emcon-xxxx.onrender.com`. Open it: that's the hosted demo hub.
+3. Build the zip for users with your address baked in:
+   ```bash
+   npm run pack -- --server=https://emcon-xxxx.onrender.com
+   ```
+4. Attach `dist/emcon-extension-v1.0.0.zip` to a GitHub Release so people can download it.
+
+Anywhere else: `docker build -t emcon . && docker run -p 8787:8787 -e EMCON_SECRET=<random> -e EMCON_PUBLIC_URL=https://your.host emcon`.
+
+| Variable | Meaning |
+|---|---|
+| `EMCON_SECRET` | All server keys are derived from it. Keep it fixed and the keys survive restarts, even on hosts that wipe the disk. |
+| `EMCON_PUBLIC_URL` | Public https address (auto-detected on Render). |
+| `EMCON_ALT_URL` | Optional second hostname for the same server. It enables the "different company" and Kestrel-clone demos when hosted. |
+| `EMCON_FEED=off` / `EMCON_FEED_URL` | Disable or replace the live phishing feed. |
+| `EMCON_ALERT_WEBHOOK` | e.g. `https://ntfy.sh/<topic>` to push guardian alerts to phones. |
+| `EMCON_DATA`, `PORT` | Data folder and port. |
 
 ## Quick start for the demo (one command)
 
@@ -40,6 +77,7 @@ On Windows you can also just double-click **`start-demo.cmd`**.
 
 This starts the server on `:8787` and opens a browser window with the EMCON extension **already loaded**, in its own profile (`data/browser-profile`), so your normal browser is never touched. It also sets up Ghost with demo PIN **2468**, so every flow works straight away. Close the window (or press Ctrl+C) to stop.
 
+- Pick the browser: `npm run demo -- --browser=brave` (or `edge` / `chrome`), or `start-demo.cmd --browser=brave`. Each browser gets its own demo profile.
 - `npm run demo:fresh` starts from a clean profile so you can show the Ghost setup (passkey/PIN) yourself.
 - `npm start` runs only the server. Then load the extension by hand: `chrome://extensions` → **Developer mode** → **Load unpacked** → pick `extension/`.
 
@@ -52,8 +90,8 @@ This starts the server on `:8787` and opens a browser window with the EMCON exte
 ### Tests
 
 ```bash
-npm test               # 34 API tests against the live server
-npm run test:browser   # 13 tests that load the real extension into headless Chrome: install flow + all four shields
+npm test               # 39 API tests against the live server
+npm run test:browser   # 15 tests that load the real extension into headless Chrome: install flow, all four shields, live-feed block, look-alike domains
 npm run test:all       # both
 ```
 
@@ -144,13 +182,11 @@ server/  (Node 22+, zero dependencies)
 
 web/        demo pages (hub, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (34 API tests) · extension.mjs (13 real-browser tests)
+test/       e2e.mjs (39 API tests) · extension.mjs (15 real-browser tests)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
 scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)
 ```
-
-Optional: set `EMCON_ALERT_WEBHOOK=https://ntfy.sh/<topic>` to push guardian alerts to phones.
 
 ## Honest limitations (say these before a judge does)
 
@@ -162,3 +198,6 @@ Optional: set `EMCON_ALERT_WEBHOOK=https://ntfy.sh/<topic>` to push guardian ale
 - **"C2PA-lite"** uses its own manifest format. It detects real C2PA but doesn't fully validate it (that needs the c2pa-rs SDK).
 - **Registrable-domain logic** uses a small built-in suffix list rather than the full Public Suffix List.
 - Stores data in a single JSON file (`data/db.json`). Swap in SQLite/Postgres for real use.
+- **Render's free plan sleeps when idle and wipes its disk.** Keys survive (they come from `EMCON_SECRET`), but demo data such as shop accounts, user reports and signed photos resets. Add a persistent disk (paid) or Postgres to keep it. The first request after sleeping takes about 50 s.
+- **Ghost needs websites to adopt it.** Only the demo shop accepts EMCON sign-in today. Phishing, look-alike, fingerprinting and provenance protection work on every site.
+- **The OpenPhish community feed** is free for non-commercial use. Commercial deployments need their premium feed or another source (`EMCON_FEED_URL`).

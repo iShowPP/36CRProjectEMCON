@@ -6,6 +6,7 @@
 
 import crypto from 'node:crypto';
 import { db, save, HttpError } from './store.js';
+import { rsaJwk } from './keys.js';
 import { signBlinded } from '../extension/lib/blindrsa.js';
 import { fromB64u, toHex, sha256, bytesToBigInt } from '../extension/lib/util.js';
 
@@ -20,8 +21,7 @@ export default async function issuer(route) {
   db.issuer ||= { keys: {}, enrollments: {} };
   for (const [bundle, claims] of Object.entries(BUNDLES)) {
     if (!db.issuer.keys[bundle]) {
-      const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-      db.issuer.keys[bundle] = privateKey.export({ format: 'jwk' });
+      db.issuer.keys[bundle] = rsaJwk('issuer/' + bundle);
       save();
     }
     const j = db.issuer.keys[bundle];

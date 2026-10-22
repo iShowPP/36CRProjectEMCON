@@ -27,7 +27,8 @@ $('#go').onclick = async () => {
   $('#msg').textContent = 'Verifying and minting blind tokens…';
   try {
     const s = await send({ type: 'ghost:enroll', dob: $('#dob').value, credId, pin: $('#pin').value });
-    $('#msg').innerHTML = `✅ Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it at <a href="http://localhost:8787/rp.html" target="_blank">ShopNorth</a>. You can close this tab.`;
+    const { server } = await send({ type: 'settings:get' });
+    $('#msg').innerHTML = `✅ Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it at <a href="${server}/rp.html" target="_blank">ShopNorth</a>. You can close this tab.`;
   } catch (e) {
     $('#msg').textContent = '⚠️ ' + e.message;
     $('#go').disabled = false;

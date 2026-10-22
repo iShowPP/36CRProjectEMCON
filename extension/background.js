@@ -9,8 +9,9 @@ import { domTokens, simhash64 } from './lib/simhash.js';
 import { computeTrust, scoreDomain } from './lib/trustgraph.js';
 import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
 import { farble } from './lib/farble.js';
+import { DEFAULT_SERVER } from './config.js';
 
-const DEFAULTS = { server: 'http://localhost:8787', farble: true, farbleExceptions: [], provenance: true, provRecovery: true, wot: true };
+const DEFAULTS = { server: DEFAULT_SERVER, farble: true, farbleExceptions: [], provenance: true, provRecovery: true, wot: true };
 const local = {
   get: async (k) => (await chrome.storage.local.get(k))[k],
   set: (k, v) => chrome.storage.local.set({ [k]: v }),
@@ -27,10 +28,12 @@ async function api(path, { method = 'GET', body } = {}) {
 
 function cached(ttlMs, fn) {
   let at = 0, val;
-  return async () => {
+  const get = async () => {
     if (!val || Date.now() - at > ttlMs) { val = fn().catch((e) => { val = null; throw e; }); at = Date.now(); }
     return val;
   };
+  get.reset = () => { val = null; };
+  return get;
 }
 
 // One random master secret; every other key is derived from it with a label.
@@ -200,6 +203,7 @@ chrome.tabs.onRemoved.addListener((tabId) => topOrigins.delete(tabId));
 // Shield 2: media provenance
 // =====================================================================
 const trustList = cached(10 * 60e3, () => api('/api/prov/trust-list'));
+const registry = cached(10 * 60e3, () => api('/api/prov/registry'));
 const provCache = new Map();
 
 function provCheck(url) {
@@ -217,8 +221,13 @@ function provCheck(url) {
         const bmp = await createImageBitmap(new Blob([bytes]));
         const h = await dhash(bmp);
         bmp.close();
-        const m = await api('/api/prov/lookup?dhash=' + h);
-        if (m.match) result = { status: 'recovered', format: result.format, match: { ...m.match, url: new URL(m.match.url, (await settings()).server).href }, distance: m.distance };
+        // Matched locally against the downloaded registry: the server never learns which images you view.
+        let best = null;
+        for (const r of await registry()) {
+          const d = hamming(h, r.dhash);
+          if (d <= 10 && (!best || d < best.distance)) best = { match: r, distance: d };
+        }
+        if (best) result = { status: 'recovered', format: result.format, ...best };
       } catch { /* recovery is best-effort */ }
     }
     return result;
@@ -236,18 +245,26 @@ async function wotIdentity() {
   return { privateKey, did: didKeyFromPub(pub) };
 }
 
+const serverGroups = cached(60 * 60e3, () => api('/api/wot/groups'));
+
+// Built-in sources (security group, live phishing feed) are followed by default,
+// including ones the server adds later, unless the user removed them.
 async function wotState() {
-  const w = (await local.get('wot')) || { roots: [], initialized: false };
-  if (!w.initialized) {
-    try {
-      const groups = await api('/api/wot/groups');
-      w.roots = groups.map((g) => ({ did: g.did, weight: g.defaultWeight ?? 0.8, label: g.name, kind: 'group' }));
-      w.initialized = true;
+  const w = (await local.get('wot')) || { roots: [], dismissed: [] };
+  w.dismissed ||= [];
+  try {
+    const known = new Set([...w.roots.map((r) => r.did), ...w.dismissed]);
+    const fresh = (await serverGroups()).filter((g) => !known.has(g.did));
+    if (fresh.length) {
+      w.roots.push(...fresh.map((g) => ({ did: g.did, weight: g.defaultWeight ?? 0.8, label: g.name, kind: 'group' })));
       await local.set('wot', w);
-    } catch { /* server offline; retry next time */ }
-  }
+      trustMapCached.reset();
+    }
+  } catch { /* server offline; retry next time */ }
   return w;
 }
+
+const trustMapCached = cached(5 * 60e3, trustMap);
 
 async function trustMap() {
   const w = await wotState();
@@ -307,6 +324,41 @@ async function domainAgeDays(host) {
 
 const brandList = cached(10 * 60e3, () => api('/api/wot/brands'));
 
+// Undo the look-alike tricks phishers use in hostnames: digits for letters, "rn" for "m",
+// accented letters. (Non-Latin look-alikes arrive as punycode and are flagged separately.)
+const CONFUSABLE = { 0: 'o', 1: 'l', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b' };
+const skeleton = (s) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/[0-9]/g, (c) => CONFUSABLE[c] || c);
+
+function editDistance(a, b) {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return row[b.length];
+}
+
+// Does this hostname borrow a brand's name? Whole hostname parts only, so "applebees" is not "apple".
+function imitation(domain, brand) {
+  const labels = domain.split('.').slice(0, -1); // the TLD can't imitate anything
+  for (const part of labels.flatMap((l) => l.split('-')).filter(Boolean)) {
+    const sk = skeleton(part);
+    for (const t of brand.tokens || []) {
+      if (part === t) return { strong: false, text: `uses the name "${t}"` };
+      if (sk === t) return { strong: true, text: `spells "${t}" with look-alike characters ("${part}")` };
+      if (t.length >= 6 && editDistance(sk, t) === 1) return { strong: true, text: `is one letter away from "${t}" ("${part}")` };
+    }
+  }
+  return null;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 async function wotAnalyze(page, sender) {
   if (!(await settings()).wot) return null;
   const url = new URL(sender.url);
@@ -318,7 +370,7 @@ async function wotAnalyze(page, sender) {
 
   // 1. People and groups you trust
   let s = { pos: 0, neg: 0, ignored: 0, evidence: [] };
-  try { s = scoreDomain(await domainAttestations(domain), await trustMap()); } catch { signals.push({ pts: 0, kind: 'wot', text: 'Trust network unreachable' }); }
+  try { s = scoreDomain(await domainAttestations(domain), await trustMapCached()); } catch { signals.push({ pts: 0, kind: 'wot', text: 'Trust network unreachable' }); }
   if (s.neg > 0) add(Math.round(70 * Math.min(1, s.neg)), 'wot', `Reported as a scam by ${s.evidence.filter((e) => e.verdict === 'scam').length} source(s) in your web of trust`);
   if (s.pos > 0) add(-Math.round(40 * Math.min(1, s.pos)), 'wot', `Vouched for by ${s.evidence.filter((e) => e.verdict === 'trusted').length} source(s) in your web of trust`);
   if (s.ignored) signals.push({ pts: 0, kind: 'wot', text: `${s.ignored} attestation(s) from strangers outside your web of trust were ignored (Sybil protection)` });
@@ -328,18 +380,33 @@ async function wotAnalyze(page, sender) {
   if (age !== null && age < 30) add(35, 'age', `Domain registered only ${age} day(s) ago`);
   else if (age !== null && age < 180) add(10, 'age', `Domain is young (${age} days)`);
 
-  // 3. Brand clone: structure + brand mention + credential form, never structure alone
+  // 3. Brand impersonation: layout clone, look-alike address, or brand + password on a
+  //    non-official domain. Never layout alone, never a brand mention alone.
   const sh = simhash64(domTokens(page.html || ''));
   const text = `${page.title} ${page.text}`.toLowerCase();
   try {
-    for (const b of await brandList()) {
-      if (b.domains.some((d) => domain === d || domain.endsWith('.' + d))) continue;
+    const others = (await brandList()).filter((b) => !b.domains.some((d) => domain === d || domain.endsWith('.' + d)));
+    const mentions = (b) => b.keywords.some((k) => new RegExp(`\\b${escapeRe(k)}\\b`).test(text));
+    let hit = false;
+    for (const b of others) {
+      if (!b.simhash) continue;
       const dist = hamming(sh, b.simhash);
-      const mention = b.keywords.some((k) => text.includes(k));
-      if (dist <= 12 && (mention || page.hasPassword)) { add(45, 'clone', `Page layout matches ${b.name}'s real login page (${64 - dist}/64 structural bits), but this site is not ${b.domains[0]}`); break; }
-      if (mention && page.hasPassword) { add(20, 'brand', `Asks for a password and mentions ${b.name}, but isn't an official ${b.name} domain`); break; }
+      if (dist <= 12 && (mentions(b) || page.hasPassword)) { add(45, 'clone', `Page layout matches ${b.name}'s real login page (${64 - dist}/64 structural bits), but this site is not ${b.domains[0]}`); hit = true; break; }
+    }
+    for (const b of hit ? [] : others) {
+      const im = imitation(domain, b);
+      if (!im) continue;
+      add(im.strong ? 45 : 25, 'lookalike', `This address ${im.text}, but it is not an official ${b.name} domain`);
+      if (page.hasPassword) add(20, 'lookalike', `It asks for a password on that look-alike address`);
+      hit = true;
+      break;
+    }
+    if (!hit && page.hasPassword) {
+      const b = others.find(mentions);
+      if (b) add(20, 'brand', `Asks for a password and mentions ${b.name}, but isn't an official ${b.name} domain`);
     }
   } catch { /* brand list unavailable */ }
+  if (page.hasPassword && domain.split('.').some((l) => l.startsWith('xn--'))) add(15, 'lookalike', 'Internationalised domain name asking for a password (a common way to fake letters)');
 
   // 4. Credential-form heuristics
   if (page.hasPassword) {
@@ -384,6 +451,7 @@ async function wotTrust({ did, weight, label, publish }) {
   w.roots = w.roots.filter((r) => r.did !== did);
   w.roots.push({ did, weight: Math.min(1, Math.max(0.05, Number(weight) || 0.5)), label: String(label || 'Friend').slice(0, 40), kind: 'person' });
   await local.set('wot', w);
+  trustMapCached.reset();
   if (publish) {
     const vc = await signCredential({
       '@context': VC_CONTEXT,
@@ -399,8 +467,10 @@ async function wotTrust({ did, weight, label, publish }) {
 
 async function wotUntrust({ did }) {
   const w = await wotState();
+  if (w.roots.find((r) => r.did === did)?.kind === 'group') w.dismissed.push(did);
   w.roots = w.roots.filter((r) => r.did !== did);
   await local.set('wot', w);
+  trustMapCached.reset();
   return w.roots;
 }
 

@@ -6,11 +6,13 @@
 //     with a demo PIN so every demo flow works immediately
 // Close the browser window (or press Ctrl+C) to stop.
 import path from 'node:path';
-import { launchBrowser, ROOT, waitFor } from '../tools/browser.mjs';
+import { launchBrowser, findBrowser, ROOT, waitFor } from '../tools/browser.mjs';
 
 const PORT = Number(process.env.PORT) || 8787;
 const BASE = `http://localhost:${PORT}`;
 const FRESH = process.argv.includes('--fresh');
+const PREFER = process.argv.find((a) => a.startsWith('--browser='))?.split('=')[1]; // chrome | edge | brave
+const DEBUG_PORT = Number(process.env.EMCON_DEBUG_PORT) || 0; // opt-in: lets a script drive the demo window
 const DEMO_PIN = '2468';
 
 async function emconServerUp() {
@@ -30,7 +32,16 @@ if (await emconServerUp()) {
   console.log(`  ✔ EMCON server started on ${BASE}`);
 }
 
-const browser = await launchBrowser({ profile: path.join(ROOT, 'data', 'browser-profile'), fresh: FRESH, startUrl: BASE + '/', headless: !!process.env.EMCON_HEADLESS });
+const exe = findBrowser(PREFER);
+const browserName = path.basename(exe, path.extname(exe)).toLowerCase();
+const browser = await launchBrowser({
+  exe,
+  profile: path.join(ROOT, 'data', `browser-profile-${browserName}`), // one profile per browser, never mixed
+  fresh: FRESH,
+  startUrl: BASE + '/',
+  headless: !!process.env.EMCON_HEADLESS,
+  extraArgs: DEBUG_PORT ? [`--remote-debugging-port=${DEBUG_PORT}`, '--remote-debugging-address=127.0.0.1'] : [],
+});
 console.log(`  ✔ ${path.basename(browser.exe)} launched with the EMCON extension (id ${browser.extensionId})`);
 
 // Talk to the extension's service worker through a hidden extension page.

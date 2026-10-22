@@ -49,8 +49,10 @@
     import { $, esc, api, hubNav, hasExtension } from '/common.js';
     hubNav('/rp.html');
     $('#origin').textContent = location.origin;
-    const other = location.hostname === 'localhost' ? location.href.replace('localhost', '127.0.0.1') : location.href.replace('127.0.0.1', 'localhost');
-    $('#other').href = other; $('#other').textContent = other;
+    const cfg = await api('/api/config');
+    const otherBase = location.origin === cfg.alt ? cfg.official : cfg.alt;
+    if (otherBase) { $('#other').href = otherBase + '/rp.html'; $('#other').textContent = otherBase + '/rp.html'; }
+    else $('#other').replaceWith('a second hostname for this server (set EMCON_ALT_URL, or run it locally)');
 
     setTimeout(() => { if (!hasExtension()) $('#noext').classList.remove('hidden'); }, 800);
 

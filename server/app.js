@@ -7,6 +7,7 @@ import rp from './rp.js';
 import prov from './prov.js';
 import vault from './vault.js';
 import wot from './wot.js';
+import { publicUrls } from './config.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -23,6 +24,7 @@ export async function createApp() {
     routes.push({ method, re, keys, handler });
   };
   for (const mod of [issuer, rp, prov, vault, wot]) await mod(route);
+  route('GET', '/api/config', ({ origin }) => publicUrls(origin));
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');

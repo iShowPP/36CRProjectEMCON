@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db, save, HttpError, MEDIA_DIR } from './store.js';
+import { ed25519Jwk } from './keys.js';
 import { contentHash, detectFormat, embedManifest, signManifest } from '../extension/lib/provenance.js';
 import { fromB64, fromB64u, toHex, sha256, ed25519FromSeed, hamming } from '../extension/lib/util.js';
 
@@ -21,8 +22,7 @@ export default async function prov(route) {
   db.prov ||= { signers: {}, registry: [], feed: [] };
   for (const [id, meta] of Object.entries(SIGNERS)) {
     if (!db.prov.signers[id]) {
-      const { privateKey } = crypto.generateKeyPairSync('ed25519');
-      db.prov.signers[id] = privateKey.export({ format: 'jwk' });
+      db.prov.signers[id] = ed25519Jwk('prov/' + id);
       save();
     }
     const jwk = db.prov.signers[id];
@@ -81,6 +81,10 @@ export default async function prov(route) {
     }
     return best || { match: null };
   });
+
+  // The whole (small) registry, so the extension can match fingerprints locally and
+  // never has to tell the server which images you are looking at.
+  route('GET', '/api/prov/registry', ({ origin }) => db.prov.registry.map((r) => ({ ...r, url: new URL(r.url, origin).href })));
 }
 
 function decodeImage(b64) {

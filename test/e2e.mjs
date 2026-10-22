@@ -7,6 +7,11 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 process.env.EMCON_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'emcon-test-'));
+process.env.EMCON_SECRET = 'e2e-test-secret';
+// Inline stand-in for the OpenPhish feed: two attacker hosts, plus a shared host and an
+// official brand host that must NOT be marked as scams.
+const FEED_LINES = ['https://live-scam-shop.test/login', 'http://www.paypa1-verify.top/secure', 'https://sites.google.com/view/fake-bank', 'https://accounts.google.com/x', 'not a url'];
+process.env.EMCON_FEED_URL = 'data:text/plain,' + encodeURIComponent(FEED_LINES.join('\n'));
 const { createApp } = await import('../server/app.js');
 const { toHex, fromHex, toB64, toB64u, randomBytes, ed25519FromSeed, ed25519Sign, didKeyFromPub, concat, hamming } = await import('../extension/lib/util.js');
 const brsa = await import('../extension/lib/blindrsa.js');
@@ -300,6 +305,54 @@ await test('phishing clone is structurally close to the real login page; unrelat
   console.log(`      (clone distance ${clone}/64, unrelated ${other}/64)`);
   assert.ok(clone <= 12, `clone distance ${clone}`);
   assert.ok(other > 12, `unrelated distance ${other}`);
+});
+
+console.log('\nReal-world & hosting');
+const getJson = async (p) => (await fetch(BASE + p)).json(); // api() spreads into an object, arrays need the raw body
+const groups = await getJson('/api/wot/groups');
+await test('live phishing feed is imported as signed reports; shared + official hosts skipped', async () => {
+  const f = await (async () => { for (let i = 0; i < 40; i++) { const r = await api('/api/wot/feed?limit=20'); if (r.updated) return r; await new Promise((s) => setTimeout(s, 100)); } })();
+  assert.ok(f, 'feed never loaded');
+  assert.deepEqual([...f.sample].sort(), ['live-scam-shop.test', 'paypa1-verify.top']);
+  const { createHash } = await import('node:crypto');
+  const r = await api('/api/wot/domain?prefix=' + createHash('sha256').update('live-scam-shop.test').digest('hex').slice(0, 5));
+  const vc = r.attestations.find((a) => a.credentialSubject.domain === 'live-scam-shop.test');
+  assert.equal(vc.issuer, groups[1].did, 'signed by the feed identity');
+  assert.equal(vc.credentialSubject.verdict, 'scam');
+  assert.ok(await verifyCredential(vc));
+});
+await test('vault treats a payee on a live-feed phishing site as a scam', async () => {
+  await api('/api/vault/payees', { method: 'POST', headers: H(real), body: { name: 'Feed scammer', account: 'X-1', domain: 'live-scam-shop.test', pin: '1234' } });
+  const st = await api('/api/vault/state', { headers: H(real) });
+  const r = await transfer(real, st.payees.find((p) => p.name === 'Feed scammer').id, 900);
+  assert.equal(r.tx.status, 'awaiting_guardians');
+  assert.ok(r.tx.risk.reasons.some((x) => x.includes('OpenPhish')));
+});
+await test('server keys survive a restart with a wiped disk (same EMCON_SECRET)', async () => {
+  const { spawn } = await import('node:child_process');
+  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'emcon-restart-'));
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  const child = spawn(process.execPath, ['server/index.js'], { cwd: new URL('..', import.meta.url), env: { ...process.env, EMCON_DATA: fresh, PORT: String(port), EMCON_FEED: 'off' }, stdio: 'ignore' });
+  try {
+    let other;
+    for (let i = 0; i < 60 && !other; i++) { try { other = await (await fetch(`http://127.0.0.1:${port}/api/issuer/keys`)).json(); } catch { await new Promise((s) => setTimeout(s, 150)); } }
+    assert.equal(other.human.keyId, keys.human.keyId);
+    assert.equal(other['human+18'].keyId, keys['human+18'].keyId);
+    assert.deepEqual((await (await fetch(`http://127.0.0.1:${port}/api/wot/groups`)).json()).map((g) => g.did), groups.map((g) => g.did));
+  } finally { child.kill(); }
+  fs.rmSync(fresh, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+});
+await test('config: local mode exposes official + alternate origins', async () => {
+  const c = await api('/api/config');
+  assert.equal(c.hosted, false);
+  assert.match(c.official, /^http:\/\/localhost:\d+$/);
+  assert.match(c.alt, /^http:\/\/127\.0\.0\.1:\d+$/);
+});
+await test('provenance registry downloads for local matching, with absolute URLs', async () => {
+  const reg = await getJson('/api/prov/registry');
+  assert.ok(Array.isArray(reg) && reg.length >= 1);
+  assert.match(reg[0].url, /^http:\/\/127\.0\.0\.1:\d+\/media\//);
+  assert.match(reg[0].dhash, /^[0-9a-f]{16}$/);
 });
 
 server.close();
