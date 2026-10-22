@@ -6,42 +6,48 @@
   <title>Welcome to EMCON</title>
   <link rel="stylesheet" href="pages.css">
   <style>
-    body { max-width: 760px; margin: 32px auto; padding: 0 16px 48px; }
-    .hero { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
-    .hero img { width: 56px; height: 56px; }
-    .hero h1 { font-size: 28px; }
-    .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-    .card h2 { font-size: 15px; }
-    .card p { margin: 4px 0 0; font-size: 13px; }
-    .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--line); margin-left: 6px; vertical-align: middle; }
-    ol li { margin: 4px 0; }
+    body { padding: 40px 16px 64px; }
+    .wrap { max-width: 780px; margin: 0 auto; }
+    .mast { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 18px; }
+    .mast img { width: 40px; height: 40px; }
+    .mast h1 { font-size: 30px; }
+    .lede { font: 18px/1.5 var(--serif); color: var(--ink-2); margin: 0 0 22px; max-width: 60ch; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 0; border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); margin-bottom: 18px; }
+    .cell { padding: 14px 16px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: var(--sheet); }
+    .cell h2 { font-size: 16px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .cell p { font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
+    .tag.ok { color: var(--ok); }
   </style>
 </head>
 <body>
-  <div class="hero"><img src="../icons/icon128.png" alt=""><div><h1>EMCON is on</h1><div class="muted">Four shields that work by proof, not guesswork.</div></div></div>
+  <div class="wrap">
+    <div class="mast"><img src="../icons/icon128.png" alt=""><div><div class="kicker">Installed</div><h1>EMCON is on</h1></div></div>
+    <p class="lede">EMCON checks the pages, images and payment flows you run into, and shows you its evidence. It never gives you a black-box score.</p>
 
-  <div class="card" style="margin-top:18px">
-    <h2>First, pin EMCON to your toolbar</h2>
-    <p>Click the puzzle-piece icon at the top right of Chrome, then the pin next to <b>EMCON</b>. The shield shows ✓ / ? / ! for every site you visit.</p>
-  </div>
-
-  <div class="grid">
-    <div class="card"><h2>🕵️ Anti-fingerprinting <span class="tag ok">active now</span></h2><p>Sites can no longer track you across the web by your device's canvas, GPU or audio fingerprint.</p></div>
-    <div class="card"><h2>🖼️ Image provenance <span class="tag ok">active now</span></h2><p>Images signed by trusted publishers get a ✔ badge, and edited copies get ✖. Unsigned images get no badge, because missing provenance doesn't mean an image is fake.</p></div>
-    <div class="card"><h2>🕸️ Scam &amp; phishing shield <span class="tag" id="t-wot">needs server</span></h2><p>Blocks fake login pages and sites that people you trust have reported as scams.</p></div>
-    <div class="card"><h2>👻 Ghost sign-in <span class="tag" id="t-ghost">needs setup</span></h2><p>Sign up on websites as a verified adult without sharing your email, phone or name.</p><button id="ghost" style="margin-top:8px">Set up Ghost</button></div>
-  </div>
-
-  <div class="card">
-    <h2>EMCON server</h2>
-    <p class="small muted">Ghost, the scam reports and recovering provenance for stripped images talk to an EMCON server. The other shields work without one.</p>
-    <div class="row" style="margin-top:8px">
-      <input id="server" style="flex:1" placeholder="https://your-emcon-server.example">
-      <button id="check" class="primary">Save &amp; check</button>
+    <div class="card">
+      <h2>First: pin EMCON to your toolbar</h2>
+      <p class="small">Click the puzzle-piece icon at the top right of the browser, then the pin next to <b>EMCON</b>. The icon shows <b>!</b> on dangerous pages, <b>?</b> where you should be careful, and <b>✓</b> on sites your network trusts.</p>
     </div>
-    <div id="status" class="small" style="margin-top:6px"></div>
-  </div>
 
+    <div class="grid">
+      <div class="cell"><h2>Anti-fingerprinting <span class="tag ok">active now</span></h2><p>Sites can't follow you across the web using your device's canvas, graphics card or audio fingerprint.</p></div>
+      <div class="cell"><h2>Image provenance <span class="tag ok">active now</span></h2><p>Photos signed by trusted publishers are labelled Verified; edited copies are labelled Altered. Unsigned images get no label: missing provenance doesn't mean an image is fake.</p></div>
+      <div class="cell"><h2>Privacy promise monitor <span class="tag ok">active now</span></h2><p>Records which third parties a page contacts and which sensitive features it uses, then checks whether tracking stops after you say no.</p></div>
+      <div class="cell"><h2>Scam and phishing checks <span class="tag" id="t-wot">needs server</span></h2><p>Blocks fake login pages, look-alike addresses and live phishing sites, and follows the chain of redirects that led you there.</p></div>
+      <div class="cell"><h2>Ghost sign-in <span class="tag" id="t-ghost">needs setup</span></h2><p>Sign up on sites that accept EMCON as a verified adult without sharing your email, phone or name.</p><button id="ghost" style="margin-top:8px">Set up Ghost</button></div>
+      <div class="cell"><h2>Evidence receipts <span class="tag ok">active now</span></h2><p>Export a signed, timestamped receipt of any check to share with a friend, teacher or security team.</p></div>
+    </div>
+
+    <div class="card">
+      <h2>EMCON server</h2>
+      <p class="small muted">Ghost, scam reports, the live phishing feed and receipt timestamps come from an EMCON server. The other checks run entirely in your browser.</p>
+      <div class="row" style="margin-top:8px">
+        <input id="server" style="flex:1" placeholder="https://your-emcon-server.example">
+        <button id="check" class="primary">Save &amp; check</button>
+      </div>
+      <div id="status" class="small" style="margin-top:6px"></div>
+    </div>
+  </div>
   <script type="module" src="welcome.js"></script>
 </body>
 </html>

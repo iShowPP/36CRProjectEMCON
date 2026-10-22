@@ -3,102 +3,111 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EMCON Demo Hub</title>
+  <title>EMCON Demo</title>
   <link rel="stylesheet" href="/style.css">
   <style>
-    .shield h2 { display: flex; gap: 8px; align-items: center; }
-    .shield ul { padding-left: 18px; margin: 6px 0 12px; font-size: 14px; }
-    .fix { font-size: 13px; color: var(--muted); }
-    .fix b { color: var(--ink); }
-    ol.steps li { margin: 6px 0; }
+    .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px; align-items: end; border-bottom: 1px solid var(--rule); padding-bottom: 24px; margin-bottom: 28px; }
+    .hero h1 { font-size: 48px; margin-bottom: 12px; }
+    ol.steps { margin: 6px 0 0; padding-left: 20px; font-size: 14px; } ol.steps li { margin: 6px 0; }
+    .feature .num { font: 600 11px var(--mono); color: var(--muted); }
+    .feature h2 { margin-top: 2px; }
+    .feature p { font-size: 14px; color: var(--ink-2); margin: 0 0 12px; }
+    .fix { margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); list-style: none; }
+    .fix li { margin: 4px 0; } .fix b { color: var(--ink); }
+    .section { font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; margin: 36px 0 10px; }
+    #feedSample { margin: 8px 0; }
+    @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } .hero h1 { font-size: 34px; } }
   </style>
 </head>
 <body>
   <main>
-    <span class="chip">Hackathon build · no AI, just cryptography</span>
-    <h1>🛡️ EMCON: four shields, one extension</h1>
-    <p class="lead">Every check below is deterministic and anyone can verify it: blind signatures, Ed25519, W3C Verifiable Credentials, structural hashing, time-locks. Nothing depends on a probabilistic "AI detector" that attackers can learn to fool.</p>
-
-    <div class="card" style="margin-bottom:16px">
-      <h2>Setup (2 minutes)</h2>
-      <ol class="steps">
-        <li>Install the extension in Chrome, Edge or Brave: <code>chrome://extensions</code> → <b>Developer mode</b> → <b>Load unpacked</b> → the <code>emcon-extension</code> folder (from the release zip, or <code>extension/</code> in the repo).</li>
-        <li>On the welcome page that opens, set the EMCON server to <code id="here"></code> and click <b>Save &amp; check</b>.</li>
-        <li>Click the 🛡️ toolbar icon → <b>Ghost</b> → <b>Set up Ghost</b>.</li>
-      </ol>
-      <div id="ext" class="small"></div>
+    <div class="hero">
+      <div>
+        <div class="kicker">EMCON · hackathon build</div>
+        <h1>Evidence, not guesses.</h1>
+        <p class="lead" style="margin:0">A browser extension that checks pages, redirect chains, images and payments, and shows you exactly why it reached each conclusion: signed reports, public registries, hashes and time-locks. No AI scores that a scammer can learn to fool.</p>
+      </div>
+      <div class="card">
+        <div class="kicker">Set up in two minutes</div>
+        <ol class="steps">
+          <li>In Chrome, Edge or Brave open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b> and pick the <code>emcon-extension</code> folder.</li>
+          <li>On the welcome page, set the server to <code id="here"></code>.</li>
+          <li>Pin EMCON to the toolbar.</li>
+        </ol>
+        <div id="ext" class="small" style="margin-top:8px"></div>
+      </div>
     </div>
 
+    <div class="section">Catches scams</div>
     <div class="grid">
-      <div class="card shield">
-        <h2>👻 1 · Ghost Engine</h2>
-        <p class="small">Sign up anywhere as a verified human (and optionally 18+) without an email, phone or cross-site ID. A different, unlinkable pseudonym on every site.</p>
-        <div class="row"><a class="btn primary" href="/rp.html">Try ShopNorth sign-in</a><a class="btn" data-alt="/rp.html" href="#">…as a "different company"</a></div>
-        <ul class="fix">
-          <li><b>Who vouches for "over 18"?</b> A self-made proof proves nothing. A one-time issuer attests it with <i>blind</i> RSA signatures, so it can't track where the tokens get spent.</li>
-          <li><b>Sybil farms:</b> single-use tokens and a monthly quota per verified human.</li>
-          <li><b>Issuer tagging users:</b> issuer keys are pinned and checked for consistency.</li>
-          <li><b>Phishing relay:</b> every sign-in is signed over the real origin (taken from Chrome, not the page).</li>
-          <li><b>Fingerprint "randomisation" makes you <i>more</i> unique.</b> Instead, noise is stable per site, high-entropy values are bucketed, and screen/locale are never faked.</li>
-        </ul>
+      <div class="card feature">
+        <div class="num">01</div><h2>Phishing and look-alike sites</h2>
+        <p>Blocks copies of real login pages, look-alike addresses (<code>paypa1-secure.com</code>), brand-new domains and sites in the live phishing feed or reported by people you trust.</p>
+        <div class="row"><a class="btn primary" data-alt="/phish-login.html" href="#">Fake bank login</a><a class="btn" href="/bank-login.html">Real bank login</a></div>
+        <ul class="fix"><li><b>Fake reviews:</b> only reports reachable from your own trust roots count, capped per branch.</li><li><b>Privacy:</b> lookups send a 5-character hash prefix, never the address.</li></ul>
       </div>
-
-      <div class="card shield">
-        <h2>🖼️ 2 · Media provenance</h2>
-        <p class="small">Asks "who published this, and has it been changed?" rather than "is this AI?". Badges show up on any site.</p>
-        <div class="row"><a class="btn primary" href="/sign.html">Provenance studio</a><a class="btn" href="/feed.html">Social feed</a></div>
-        <ul class="fix">
-          <li><b>Platforms strip metadata:</b> a perceptual-hash registry recovers provenance, and the badge links to the original so you can compare.</li>
-          <li><b>"Unsigned = fake" is false and harmful.</b> Unsigned images get no badge. Only positive evidence or tampering is shown.</li>
-          <li><b>Copy a real signature onto an edited photo:</b> the hash covers the pixels, so the edit is caught as "Altered".</li>
-          <li><b>Anyone can sign:</b> only keys on the trust list count as "Verified".</li>
-        </ul>
+      <div class="card feature">
+        <div class="num">02</div><h2>Scam chain detector</h2>
+        <p>Follows the path to a page: link clicks, redirects, shorteners, tabs opened from other tabs. Combines prize or threat wording, the hops and a request for card details into one explained warning.</p>
+        <div class="row"><a class="btn primary" href="/sms.html">Prize SMS demo</a></div>
+        <ul class="fix"><li><b>No mind-reading:</b> EMCON never reads your messages. You can paste one; it stays local.</li><li><b>No false alarms on checkouts:</b> redirects plus card fields alone never trigger it.</li></ul>
       </div>
-
-      <div class="card shield">
-        <h2>🏦 3 · Honey-Vault</h2>
-        <p class="small">Scam brakes for payments: risk-scaled cooling-off, scam-script check-in, guardians, duress PIN, panic freeze.</p>
-        <div class="row"><a class="btn primary" href="/vault.html">Open Kestrel Bank</a></div>
-        <ul class="fix">
-          <li><b>"Just wait 15 min" is easy to coach around.</b> The delay scales with risk, the release needs a check-in, and red flags go to guardians.</li>
-          <li><b>Thief switches off the protections first:</b> loosening a setting is time-locked and announced to guardians.</li>
-          <li><b>Duress PIN must not visibly fail:</b> the whole session becomes a consistent decoy.</li>
-          <li><b>On-chain duress leaks:</b> the Solidity vault covers the time-locks, and duress stays off-chain.</li>
-        </ul>
-      </div>
-
-      <div class="card shield">
-        <h2>🕸️ 4 · Web of Trust</h2>
-        <p class="small">Domains are rated by signed attestations from people and groups <i>you</i> trust, plus a structural check for brand clones.</p>
-        <div class="row"><a class="btn" href="/bank-login.html">Real bank login</a><a class="btn primary" data-alt="/phish-login.html" href="#">Phishing clone</a></div>
-        <ul class="fix">
-          <li><b>Fake-review Sybils:</b> only identities reachable from your own trust roots count, and each root's branch is capped.</li>
-          <li><b>Lookups would leak your browsing:</b> the server only ever sees a 5-hex-char hash prefix (k-anonymity).</li>
-          <li><b>Compromised relay:</b> every credential is re-verified in your browser.</li>
-          <li><b>Generic login pages look alike:</b> a clone needs a structure match <i>and</i> a brand mention or credential form on a non-official domain.</li>
-        </ul>
+      <div class="card feature">
+        <div class="num">03</div><h2>Honey-Vault payments</h2>
+        <p>Scam brakes inside the bank: risk-scaled cooling-off, a scam-script check-in, guardians who co-sign or veto, a duress PIN, and settings that can only be loosened slowly.</p>
+        <div class="row"><a class="btn primary" href="/vault.html">Kestrel Bank</a></div>
+        <ul class="fix"><li><b>Coached victims:</b> the delay grows with risk and red-flag answers go to guardians.</li><li><b>Thieves with your PIN:</b> loosening a protection takes 24 hours and alerts guardians.</li></ul>
       </div>
     </div>
 
-    <div class="card stack" style="margin-top:16px">
-      <h2>🌍 Try it on real websites</h2>
-      <p class="small">EMCON isn't limited to these demo pages. With the extension installed, it works on the whole web:</p>
-      <ul class="fix">
-        <li><b>Live phishing sites:</b> EMCON follows the OpenPhish community feed. Right now it knows <b id="feedCount">…</b> active phishing sites (updated <span id="feedWhen">…</span>). Some currently listed addresses:
-          <div id="feedSample" class="mono small" style="margin:6px 0"></div>
-          <span class="small" style="color:var(--bad)">⚠️ These are real scam sites. Only open one in a browser with EMCON installed, and never type anything into it. EMCON should block it straight away.</span></li>
-        <li><b>Look-alike addresses:</b> sites like <code>paypa1-secure.com</code> or <code>hdfcbank-kyc.top</code> get flagged because they borrow a real brand's name (PayPal, Google, Microsoft, Apple, Amazon, SBI, HDFC, ICICI and more) without being its official domain.</li>
-        <li><b>Brand-new domains:</b> registration dates come from the public RDAP registry. A login page on a domain registered this week is a red flag.</li>
-        <li><b>Anti-fingerprinting:</b> open <a href="https://browserleaks.com/canvas" target="_blank" rel="noopener">browserleaks.com/canvas</a>. Your canvas signature stays the same on that site but differs on every other site, so trackers can't follow you.</li>
-        <li><b>Content Credentials:</b> real photos carrying C2PA credentials (Adobe, Leica, Nikon, LinkedIn…) get an ⓘ badge wherever they appear.</li>
-      </ul>
+    <div class="section">Explains itself</div>
+    <div class="grid">
+      <div class="card feature">
+        <div class="num">04</div><h2>Evidence receipts</h2>
+        <p>Every check is a row marked <i>found, clear, unknown</i> or <i>not applicable</i>. Export a receipt signed with your EMCON key and timestamped by the server, which sees only a hash of it.</p>
+        <div class="row"><a class="btn primary" href="/verify.html">Verify a receipt</a></div>
+        <ul class="fix"><li><b>Honest limits:</b> a receipt proves what EMCON observed and when, not that a site is guilty.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="num">05</div><h2>Privacy promise monitor</h2>
+        <p>Records which third parties a page contacts and which sensitive features it uses, then checks the site's declared promise and the legal baseline: tracking stops when you say no.</p>
+        <div class="row"><a class="btn primary" href="/news.html">Newspaper demo</a></div>
+        <ul class="fix"><li><b>Observed, not inferred:</b> every claim lists the domains and features your browser actually saw.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="num">06</div><h2>Media provenance</h2>
+        <p>Asks "who published this, and has it changed?" instead of "is this AI?". Verified, altered, recovered after stripping, or unknown signer. Unsigned images get no label.</p>
+        <div class="row"><a class="btn primary" href="/sign.html">Provenance studio</a><a class="btn" href="/feed.html">Feed</a></div>
+        <ul class="fix"><li><b>Stripped metadata:</b> a visual fingerprint finds the signed original, matched on your machine.</li></ul>
+      </div>
+    </div>
+
+    <div class="section">Protects your identity</div>
+    <div class="grid">
+      <div class="card feature">
+        <div class="num">07</div><h2>Ghost sign-in</h2>
+        <p>Sign up as a verified adult with no email, name or cross-site ID: blind-signed tokens and a different key on every site.</p>
+        <div class="row"><a class="btn primary" href="/rp.html">ShopNorth sign-in</a><a class="btn" data-alt="/rp.html" href="#">As a second company</a></div>
+      </div>
+      <div class="card feature">
+        <div class="num">08</div><h2>Anti-fingerprinting</h2>
+        <p>Stable per-site noise and bucketed hardware values, so trackers can't follow your device across sites and sites don't break.</p>
+        <div class="row"><a class="btn" href="https://browserleaks.com/canvas" target="_blank" rel="noopener">Test on browserleaks.com</a></div>
+      </div>
+    </div>
+
+    <div class="section">On real websites, right now</div>
+    <div class="card">
+      <p style="margin-top:0">EMCON follows the OpenPhish community feed: <b id="feedCount">…</b> active phishing sites, updated <span id="feedWhen">…</span>. Some addresses currently listed (written with [.] so they can't be clicked):</p>
+      <div id="feedSample" class="mono"></div>
+      <p class="small bad" style="margin-bottom:0">These are real scam sites. Only open one in a browser with EMCON installed, and never type anything into it.</p>
     </div>
   </main>
   <script type="module">
     import { $, $$, esc, api, ago, hubNav, hasExtension } from '/common.js';
     hubNav('/');
     setTimeout(() => {
-      $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">✔ EMCON extension detected on this page</span>' : '<span class="chip warn">Extension not detected yet</span>';
+      $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">EMCON is running on this page</span>' : '<span class="chip warn">Extension not detected on this page yet</span>';
     }, 700);
 
     const cfg = await api('/api/config');
@@ -115,7 +124,7 @@
       $('#feedSample').innerHTML = feed.sample.map((h) => `<div>${esc(h.replace(/\./g, '[.]'))}</div>`).join('');
     } else {
       $('#feedCount').textContent = feed?.enabled === false ? 'no (feed disabled on this server)' : '0 (feed not loaded yet)';
-      $('#feedWhen').textContent = '—';
+      $('#feedWhen').textContent = 'n/a';
     }
   </script>
 </body>

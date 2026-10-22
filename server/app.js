@@ -7,7 +7,13 @@ import rp from './rp.js';
 import prov from './prov.js';
 import vault from './vault.js';
 import wot from './wot.js';
+import timestamp from './timestamp.js';
 import { publicUrls } from './config.js';
+
+// Demo "link shortener" hops for the scam-chain demo: /s/qk50 -> /r?to=/claim.html -> /claim.html.
+// Only same-site paths are allowed, so this is not an open redirect.
+const SHORT_LINKS = { qk50: '/claim.html' };
+const safePath = (p) => (typeof p === 'string' && p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') ? p : '/');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -23,7 +29,7 @@ export async function createApp() {
     const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
     routes.push({ method, re, keys, handler });
   };
-  for (const mod of [issuer, rp, prov, vault, wot]) await mod(route);
+  for (const mod of [issuer, rp, prov, vault, wot, timestamp]) await mod(route);
   route('GET', '/api/config', ({ origin }) => publicUrls(origin));
 
   const server = http.createServer(async (req, res) => {
@@ -32,6 +38,10 @@ export async function createApp() {
     res.setHeader('Access-Control-Allow-Headers', 'content-type, x-vault-session');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
+
+    const short = /^\/s\/(\w+)$/.exec(url.pathname);
+    if (short) return res.writeHead(302, { location: '/r?to=' + encodeURIComponent(SHORT_LINKS[short[1]] || '/') }).end();
+    if (url.pathname === '/r') return res.writeHead(302, { location: safePath(url.searchParams.get('to')) }).end();
 
     if (url.pathname.startsWith('/api/')) {
       const send = (status, obj) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(obj));

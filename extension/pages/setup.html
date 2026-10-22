@@ -4,31 +4,35 @@
   <meta charset="utf-8">
   <title>Set up EMCON Ghost</title>
   <link rel="stylesheet" href="pages.css">
-  <style> body { max-width: 560px; margin: 40px auto; padding: 0 16px; } h1 { font-size: 24px; margin-bottom: 8px; } </style>
+  <style> body { padding: 40px 16px; } .wrap { max-width: 580px; margin: 0 auto; } h1 { margin: 4px 0 8px; } .step { font: 600 12px var(--mono); color: var(--muted); } </style>
 </head>
 <body>
-  <h1>👻 Set up EMCON Ghost</h1>
-  <p class="muted">You verify yourself <b>once</b> with an issuer. In return you get a batch of <i>blind</i> tokens. The issuer signs them without seeing them, so it can never tell where you spend them.</p>
+  <div class="wrap">
+    <div class="kicker">EMCON · Ghost sign-in</div>
+    <h1>Set up Ghost</h1>
+    <p class="muted">You verify yourself <b>once</b> with an issuer. In return you get a batch of <i>blind</i> tokens: the issuer signs them without seeing them, so it can never tell where you spend them.</p>
 
-  <div class="card">
-    <h2>1 · Lock Ghost to you</h2>
-    <p class="small muted">Every sign-in needs your fingerprint, face, security key or PIN, so malware or a borrowed laptop can't silently use your identities.</p>
-    <button id="passkey" class="primary">Use a passkey (Windows Hello / Touch ID / YubiKey)</button>
-    <div id="pkMsg" class="small" style="margin-top:6px"></div>
-    <details style="margin-top:8px"><summary class="small">No passkey? Use a local PIN instead</summary>
-      <label for="pin">PIN (4+ digits)</label><input id="pin" type="password" inputmode="numeric">
-    </details>
+    <div class="card">
+      <div class="step">Step 1</div>
+      <h2>Lock Ghost to you</h2>
+      <p class="small muted">Every sign-in needs your fingerprint, face, security key or PIN, so malware or a borrowed laptop can't quietly use your identities.</p>
+      <button id="passkey" class="primary">Use a passkey (Windows Hello, Touch ID, security key)</button>
+      <div id="pkMsg" class="small" style="margin-top:6px"></div>
+      <details style="margin-top:8px"><summary class="small">No passkey? Use a local PIN instead</summary>
+        <label for="pin">PIN (4+ digits)</label><input id="pin" type="password" inputmode="numeric">
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="step">Step 2</div>
+      <h2>One-time verification (demo issuer)</h2>
+      <p class="small muted">In production this is an ID scan, a bank KYC check or a national eID. The demo issuer only needs your date of birth. It keeps the eligibility result ("18+: yes") and discards the date.</p>
+      <label for="dob">Date of birth</label><input id="dob" type="date" value="1998-05-14">
+    </div>
+
+    <button id="go" class="primary">Verify &amp; get tokens</button>
+    <div id="msg" class="small" style="margin-top:10px"></div>
   </div>
-
-  <div class="card">
-    <h2>2 · One-time verification (demo issuer)</h2>
-    <p class="small muted">In production this is an ID scan, a bank KYC check or a national eID. The demo issuer only needs your date of birth. It keeps the eligibility result ("18+: yes") and throws the date away.</p>
-    <label for="dob">Date of birth</label><input id="dob" type="date" value="1998-05-14">
-  </div>
-
-  <button id="go" class="primary">Verify &amp; get tokens</button>
-  <div id="msg" class="small" style="margin-top:10px"></div>
-
   <script type="module" src="setup.js"></script>
 </body>
 </html>

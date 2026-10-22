@@ -8,7 +8,7 @@
 </head>
 <body>
   <main>
-    <h1>🛡️ Guardian console</h1>
+    <h1>Guardian console</h1>
     <p class="lead" id="who">Loading…</p>
     <div id="banner" class="stack"></div>
     <div class="grid" style="margin-top:16px">
@@ -29,17 +29,17 @@
     function render() {
       const clock = s.clock;
       $('#who').textContent = `Signed in as ${s.guardian.name}. You co-sign risky payments for this account. Any one guardian can veto.`;
-      $('#banner').innerHTML = (s.duressActive ? `<div class="notice bad">🚨 <b>DURESS PIN USED.</b> The account owner may be under coercion right now. Call them on a known number or contact police. ${money(s.freezeVault)} is safely parked in the freeze vault. Closing the episode needs ${s.required} guardians (${s.clearVotes} so far). <button id="clear">Vote to close the episode &amp; return the money</button></div>` : '')
-        + (s.frozen ? '<div class="notice bad">🧊 Account is frozen.</div>' : '');
+      $('#banner').innerHTML = (s.duressActive ? `<div class="notice bad"><b>DURESS PIN USED.</b> The account owner may be under coercion right now. Call them on a known number or contact police. ${money(s.freezeVault)} is safely parked in the freeze vault. Closing the episode needs ${s.required} guardians (${s.clearVotes} so far). <button id="clear">Vote to close the episode &amp; return the money</button></div>` : '')
+        + (s.frozen ? '<div class="notice bad">Account is frozen.</div>' : '');
       $('#pending').innerHTML = s.pending.length ? s.pending.map((t) => `
         <div style="padding:8px 0;border-bottom:1px solid var(--line)">
           <div><b>${money(t.amount)}</b> → ${esc(t.payeeName)} <span class="muted small">${ago(t.createdAt, clock)} · releases in ${until(t.releaseAt, clock)} · ${t.approvals}/${t.required} approvals</span></div>
           <ul class="small muted">${t.risk.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
-          ${t.quiz ? `<div class="small">Check-in answers: ${s.quiz.map((q) => `<div>${t.quiz.answers[q.id] === 'yes' ? '🔴 YES' : '⚪ no'} · ${esc(q.q)}</div>`).join('')}</div>` : '<div class="small muted">Owner hasn\'t done the check-in yet.</div>'}
+          ${t.quiz ? `<div class="small">Check-in answers: ${s.quiz.map((q) => `<div>${t.quiz.answers[q.id] === 'yes' ? '<b class="bad">YES</b>' : 'no'} · ${esc(q.q)}</div>`).join('')}</div>` : '<div class="small muted">Owner hasn\'t done the check-in yet.</div>'}
           <div class="row" style="margin-top:6px">${t.approvedByMe ? '<span class="chip ok">You approved</span>' : `<button class="primary" data-approve="${t.id}">Approve</button>`}<button class="danger" data-veto="${t.id}">Veto</button></div>
         </div>`).join('') : '<p class="muted small">Nothing waiting.</p>';
-      $('#settings').innerHTML = s.pendingSettings.length ? s.pendingSettings.map((p) => `<div class="small">⏳ <b>${esc(p.key)}</b>: ${p.from} → ${p.to} (in ${until(p.effectiveAt, clock)}) <button data-vetoset="${p.id}">Veto</button></div>`).join('') : '<p class="muted small">No pending changes.</p>';
-      $('#acct').innerHTML = `<button data-freeze="${s.frozen ? '0' : '1'}" class="${s.frozen ? '' : 'danger'}">${s.frozen ? 'Unfreeze account' : '🧊 Freeze account'}</button>`;
+      $('#settings').innerHTML = s.pendingSettings.length ? s.pendingSettings.map((p) => `<div class="small"><b>${esc(p.key)}</b>: ${p.from} → ${p.to} (in ${until(p.effectiveAt, clock)}) <button data-vetoset="${p.id}">Veto</button></div>`).join('') : '<p class="muted small">No pending changes.</p>';
+      $('#acct').innerHTML = `<button data-freeze="${s.frozen ? '0' : '1'}" class="${s.frozen ? '' : 'danger'}">${s.frozen ? 'Unfreeze account' : 'Freeze account'}</button>`;
       $('#alerts').innerHTML = s.alerts.map((a) => `<div>• <span class="muted">${ago(a.at, clock)}</span> ${esc(a.text)}</div>`).join('') || '<span class="muted">None.</span>';
     }
 
@@ -54,7 +54,7 @@
       } catch (err) { alert(err.message); }
     });
 
-    async function load() { try { s = await api(base); render(); } catch (e) { $('#who').textContent = '⚠️ ' + e.message; } }
+    async function load() { try { s = await api(base); render(); } catch (e) { $('#who').textContent = 'Error: ' + e.message; } }
     load(); setInterval(load, 4000);
   </script>
 </body>

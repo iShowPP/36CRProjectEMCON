@@ -16,7 +16,7 @@ $('#passkey').onclick = async () => {
       },
     });
     credId = b64u(cred.rawId);
-    $('#pkMsg').textContent = '✅ Passkey created. Sign-ins will ask for it.';
+    $('#pkMsg').textContent = 'Passkey created. Sign-ins will ask for it.';
   } catch (e) {
     $('#pkMsg').textContent = `Passkey unavailable here (${e.name}). Use the PIN option instead.`;
   }
@@ -28,9 +28,9 @@ $('#go').onclick = async () => {
   try {
     const s = await send({ type: 'ghost:enroll', dob: $('#dob').value, credId, pin: $('#pin').value });
     const { server } = await send({ type: 'settings:get' });
-    $('#msg').innerHTML = `✅ Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it at <a href="${server}/rp.html" target="_blank">ShopNorth</a>. You can close this tab.`;
+    $('#msg').innerHTML = `Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it at <a href="${server}/rp.html" target="_blank">ShopNorth</a>, a demo site that accepts Ghost sign-in. You can close this tab.`;
   } catch (e) {
-    $('#msg').textContent = '⚠️ ' + e.message;
+    $('#msg').textContent = e.message;
     $('#go').disabled = false;
   }
 };

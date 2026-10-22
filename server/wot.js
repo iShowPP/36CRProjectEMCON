@@ -59,6 +59,8 @@ export default async function wot(route) {
   const official = fs.readFileSync(path.join(ROOT, 'web', 'bank-login.html'), 'utf8');
   brands = [
     { name: 'Kestrel Bank', domains: [OFFICIAL_HOST, 'kestrel-bank.example'], keywords: ['kestrel bank', 'kestrel'], tokens: [], simhash: simhash64(domTokens(official)) },
+    // fictional shop impersonated by the scam-chain demo (never a real brand on a public page)
+    { name: 'QuickKart', domains: ['quickkart.example'], keywords: ['quickkart'], tokens: ['quickkart'], simhash: null },
     ...REAL_BRANDS.map((b) => ({ ...b, keywords: b.tokens, simhash: null })),
   ];
 

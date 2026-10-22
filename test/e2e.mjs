@@ -355,6 +355,31 @@ await test('provenance registry downloads for local matching, with absolute URLs
   assert.match(reg[0].dhash, /^[0-9a-f]{16}$/);
 });
 
+console.log('\nEvidence receipts & scam-chain demo');
+await test('timestamp service signs digest + time; receipts verify and tampering is caught', async () => {
+  const { receiptDigest, verifyReceipt } = await import('../extension/lib/receipt.js');
+  const { did } = await getJson('/api/timestamp/key');
+  const me = await ed25519FromSeed(randomBytes(32));
+  const meDid = didKeyFromPub(me.pub);
+  const doc = { '@context': VC_CONTEXT, type: ['VerifiableCredential', 'EmconEvidenceReceipt'], issuer: meDid, validFrom: new Date().toISOString(), credentialSubject: { id: 'https://x.test/', kind: 'website', checks: [{ label: 'Domain age', status: 'found', detail: '3 days' }] } };
+  const ts = await api('/api/timestamp', { method: 'POST', body: { digest: await receiptDigest(doc) } });
+  assert.equal(ts.signer, did);
+  const vc = await signCredential({ ...doc, evidenceTimestamp: { digest: ts.digest, time: ts.time, signer: ts.signer, sig: ts.sig } }, me.privateKey, meDid);
+  const ok = await verifyReceipt(vc, { timestampDid: did });
+  assert.equal(ok.signature, true);
+  assert.equal(ok.timestamp.status, 'valid');
+  const otherServer = await verifyReceipt(vc, { timestampDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' });
+  assert.equal(otherServer.timestamp.status, 'invalid', 'timestamp from a different server is not accepted');
+  assert.equal((await api('/api/timestamp', { method: 'POST', body: { digest: 'nope' } })).status, 400);
+});
+await test('demo shortener hops redirect only within the site (no open redirect)', async () => {
+  const hop = async (p) => { const r = await fetch(BASE + p, { redirect: 'manual' }); return [r.status, r.headers.get('location')]; };
+  assert.deepEqual(await hop('/s/qk50'), [302, '/r?to=%2Fclaim.html']);
+  assert.deepEqual(await hop('/r?to=%2Fclaim.html'), [302, '/claim.html']);
+  assert.deepEqual(await hop('/r?to=%2F%2Fevil.example'), [302, '/']);
+  assert.deepEqual(await hop('/r?to=https%3A%2F%2Fevil.example'), [302, '/']);
+});
+
 server.close();
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}\n`);
 fs.rmSync(process.env.EMCON_DATA, { recursive: true, force: true });

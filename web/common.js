@@ -25,10 +25,10 @@ export async function api(path, { method = 'GET', body, headers = {} } = {}) {
 }
 
 export function hubNav(active) {
-  const links = [['/', 'Hub'], ['/rp.html', 'Ghost sign-in'], ['/sign.html', 'Provenance studio'], ['/feed.html', 'Feed'], ['/vault.html', 'Vault'], ['/bank-login.html', 'Bank login']];
+  const links = [['/', 'Overview'], ['/rp.html', 'Ghost sign-in'], ['/sign.html', 'Provenance'], ['/feed.html', 'Feed'], ['/vault.html', 'Vault'], ['/sms.html', 'Scam chain'], ['/news.html', 'Privacy'], ['/verify.html', 'Verify receipt']];
   const h = document.createElement('header');
   h.className = 'top';
-  h.innerHTML = `<span class="brand">🛡️ EMCON demo</span><nav>${links.map(([href, t]) => `<a href="${href}" ${href === active ? 'style="color:var(--ink);font-weight:600"' : ''}>${t}</a>`).join('')}</nav>`;
+  h.innerHTML = `<a class="brand" href="/">EMCON<small>demo</small></a><nav>${links.map(([href, t]) => `<a href="${href}" class="${href === active ? 'on' : ''}">${t}</a>`).join('')}</nav>`;
   document.body.prepend(h);
 }
 

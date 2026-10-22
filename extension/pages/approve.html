@@ -2,18 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>EMCON Ghost — sign-in request</title>
+  <title>EMCON Ghost: sign-in request</title>
   <link rel="stylesheet" href="pages.css">
-  <style> body { padding: 18px; } .site { font-size: 18px; font-weight: 800; word-break: break-all; } li { margin: 4px 0; } </style>
+  <style>
+    body { padding: 20px; }
+    .site { font: 600 15px var(--mono); word-break: break-all; margin: 4px 0 12px; }
+    ul { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; } li { margin: 3px 0; }
+    h2 { font-size: 15px; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <h1>👻 Sign-in request</h1>
+  <div class="kicker">EMCON Ghost · sign-in request</div>
+  <h1 style="font-size:22px;margin-top:4px">Approve this sign-in?</h1>
   <p class="site" id="origin"></p>
   <div class="card">
     <h2>This site will learn</h2>
-    <ul id="shares" class="small"></ul>
-    <h2>It will NOT learn</h2>
-    <ul class="small muted"><li>Your name, email, phone or birthdate</li><li>Any ID that other sites also see</li><li>Who verified you, or when</li></ul>
+    <ul id="shares"></ul>
+    <h2>It will not learn</h2>
+    <ul class="muted"><li>Your name, email, phone or birthdate</li><li>Any ID that other sites also see</li><li>Who verified you, or when</li></ul>
   </div>
   <div id="pinBox" class="hidden"><label for="pin">Your Ghost PIN</label><input id="pin" type="password" inputmode="numeric" autofocus></div>
   <div class="row" style="margin-top:12px">

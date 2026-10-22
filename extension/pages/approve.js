@@ -4,7 +4,7 @@ const id = new URLSearchParams(location.search).get('id');
 const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
 
 let info;
-try { info = await send({ type: 'ghost:approval-info', id }); } catch (e) { $('#msg').textContent = '⚠️ ' + e.message; }
+try { info = await send({ type: 'ghost:approval-info', id }); } catch (e) { $('#msg').textContent = e.message; }
 
 if (info) {
   $('#origin').textContent = info.origin;
@@ -25,7 +25,7 @@ $('#ok').onclick = async () => {
     }
     await send({ type: 'ghost:approve', id, ok: true, pin: $('#pin').value });
     window.close();
-  } catch (e) { $('#msg').textContent = '⚠️ ' + (e.message || e.name); }
+  } catch (e) { $('#msg').textContent = (e.message || e.name); }
 };
 $('#no').onclick = async () => { await send({ type: 'ghost:approve', id, ok: false }).catch(() => {}); window.close(); };
 $('#pin').onkeydown = (e) => e.key === 'Enter' && $('#ok').click();

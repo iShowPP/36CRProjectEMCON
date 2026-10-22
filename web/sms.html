@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scam chain demo</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .split { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 32px; align-items: start; }
+    .phone { background: #0f0f10; border-radius: 28px; padding: 14px; color: #e9e6df; }
+    .screen { background: #1b1b1c; border-radius: 18px; padding: 16px 14px 22px; min-height: 420px; font: 14px/1.45 var(--sans); }
+    .from { text-align: center; font: 600 12px var(--mono); color: #9a958c; margin-bottom: 14px; }
+    .bubble { background: #2b2b2d; border-radius: 16px 16px 16px 4px; padding: 11px 13px; max-width: 92%; }
+    .bubble a { color: #8fb4ff; word-break: break-all; }
+    .time { font: 11px var(--mono); color: #77736b; margin: 6px 0 0 4px; }
+    ol.steps { padding-left: 20px; } ol.steps li { margin: 8px 0; }
+    @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="kicker">Demo · Scam chain detector</div>
+    <h1>One message, three hops, one fake form.</h1>
+    <p class="lead">Scams rarely live on one page. They start with a message, bounce through redirects, and end on a form that asks for your card and OTP. EMCON follows the whole path inside the browser and warns about the combination.</p>
+    <div class="split">
+      <div class="phone"><div class="screen">
+        <div class="from">QK-REWARD · SMS · Today 09:41</div>
+        <div class="bubble">QuickKart: Congratulations! You have won a ₹50,000 gift card in our anniversary lucky draw. Claim within 24 hours or it expires: <a id="sms-link" href="/s/qk50">http://qkrwd.example/s/qk50</a></div>
+        <div class="time">Delivered</div>
+      </div></div>
+      <div class="card">
+        <h2>What to do</h2>
+        <ol class="steps">
+          <li>Tap the link in the message, as a victim would.</li>
+          <li>The link goes through two automatic redirects (<code>/s/qk50</code> → <code>/r</code>) to a "claim your prize" page that asks for card number, CVV and OTP.</li>
+          <li>EMCON blocks the final page and shows the whole chain: <i>prize wording → redirects → QuickKart's name on an unofficial site → asks for card details</i>.</li>
+        </ol>
+        <p class="small muted">EMCON can't read your SMS or WhatsApp. In this demo the message is a web page, so the chain starts here. In real life you can paste the message into the EMCON popup ("Got here from a message?"), and it's checked locally together with the path.</p>
+        <p class="small muted">QuickKart is a fictional shop and nothing you type on the next page is stored.</p>
+      </div>
+    </div>
+  </main>
+  <script type="module">import { hubNav } from '/common.js'; hubNav('/sms.html');</script>
+</body>
+</html>

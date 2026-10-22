@@ -82,7 +82,7 @@ async function ghostSignIn(page, { over18 = true, pin = '2468', decline = false 
   const shown = await approveNext({ pin, decline });
   const outcome = await waitFor(() => page.eval(`(() => {
     const r = document.querySelector('#result:not(.hidden) h2'); if (r) return { ok: true, text: r.textContent };
-    const s = document.querySelector('#status').textContent; if (s.startsWith('⚠️')) return { ok: false, text: s };
+    const s = document.querySelector('#status').textContent; if (s.startsWith('Error:')) return { ok: false, text: s };
   })()`), { what: 'sign-in result' });
   return { ...outcome, shown };
 }
@@ -159,10 +159,10 @@ await test('feed shows verified / altered / recovered / unknown-signer badges an
   const { badges } = await extensionUi(f);
   console.log('      badges:', badges.join(' | '));
   assert.equal(badges.length, 4, 'exactly four images carry a badge');
-  assert.ok(badges.some((b) => b.startsWith('✔ Verified')));
-  assert.ok(badges.some((b) => b.startsWith('✖ Altered')));
-  assert.ok(badges.some((b) => b.startsWith('↺ Provenance recovered')));
-  assert.ok(badges.some((b) => b.startsWith('? Signed')));
+  assert.ok(badges.some((b) => b.startsWith('Verified · Kestrel Daily News')));
+  assert.ok(badges.some((b) => b.startsWith('Altered after signing')));
+  assert.ok(badges.some((b) => b.startsWith('Recovered · Kestrel Daily News')));
+  assert.ok(badges.some((b) => b.startsWith('Signed · unknown signer')));
   void ui;
 });
 
@@ -213,6 +213,96 @@ await test('you can publish your own signed attestation and DID', async () => {
   assert.equal(me.result.roots[0].label, 'EMCON SecOps Collective (demo)');
   const r = await ext({ type: 'wot:attest', domain: 'shop.test', verdict: 'trusted', transacted: true });
   assert.equal(r.result, true, r.error);
+});
+
+const tabIdFor = async (prefix) => {
+  const tabs = await extPage.eval('new Promise((r) => chrome.tabs.query({}, (t) => r(t.map((x) => ({ id: x.id, url: x.url })))))');
+  return tabs.find((t) => t.url?.startsWith(prefix))?.id;
+};
+
+console.log('\nScam chain detector');
+await test('prize SMS → 2 redirects → fake claim page is blocked, with the whole chain explained', async () => {
+  const p = await browser.open(L + '/sms.html');
+  await ready(p);
+  await sleep(1500); // let EMCON record the message page as step 1
+  await p.eval("document.querySelector('#sms-link').click()");
+  const ui = await waitFor(async () => { const u = await extensionUi(p); return u.wall && u; }, { timeout: 25000, what: 'block page on the claim page' });
+  console.log('      ' + ui.wall.replace(/\s+/g, ' ').slice(0, 420) + '…');
+  assert.match(ui.wall, /Scam chain/);
+  assert.match(ui.wall, /2 automatic redirect/);
+  assert.match(ui.wall, /card number/);
+  assert.match(ui.wall, /QuickKart/);
+  assert.match(ui.wall, /localhost\/s\/qk50/);
+});
+await test('a pasted message joins the chain (and stays local)', async () => {
+  const tabId = await tabIdFor(L + '/claim.html');
+  const r = await ext({ type: 'chain:message', tabId, text: 'Your parcel is held at customs. Pay the customs fee here: http://localhost/s/qk50' });
+  assert.ok(!r.error, r.error);
+  const msg = r.result.checks.find((c) => c.id === 'message');
+  assert.equal(msg.status, 'found');
+  assert.match(msg.detail, /leads into this chain/);
+});
+
+console.log('\nPrivacy promise monitor');
+await test('newspaper breaks its declared promise, before and after "Reject all"', async () => {
+  const p = await browser.open(L + '/news.html');
+  await ready(p);
+  await sleep(1000);
+  await p.eval("document.querySelector('#reject').click()");
+  await sleep(2500);
+  const r = (await ext({ type: 'privacy:tab', tabId: await tabIdFor(L + '/news.html') })).result;
+  const by = Object.fromEntries(r.promises.map((x) => [x.text, x]));
+  console.log('      ' + by['Stops tracking after you say no'].evidence);
+  assert.equal(by['No third-party tracking'].status, 'broken');
+  assert.equal(by['Stops tracking after you say no'].status, 'broken');
+  assert.match(by['Stops tracking after you say no'].evidence, /Reject all/);
+  assert.ok(r.thirdParties.some((t) => t.host === 'collect.adnetwork-demo.example' && t.afterDenial >= 1), 'tracker contacted after denial');
+  assert.ok(r.features.some((f) => f.f === 'canvas-readback' && f.afterDenial > 0), 'canvas fingerprinting after denial');
+});
+await test('a page that stops after you say no keeps the baseline promise', async () => {
+  const p = await browser.open(L + '/vault.html');
+  await ready(p);
+  const tabId = await tabIdFor(L + '/vault.html');
+  await ext({ type: 'privacy:mark', tabId, state: 'denied' });
+  await sleep(1500);
+  const r = (await ext({ type: 'privacy:tab', tabId })).result;
+  assert.equal(r.promises.find((x) => x.text === 'Stops tracking after you say no').status, 'kept');
+  assert.equal(r.trackerCount, 0);
+});
+
+console.log('\nEvidence receipts');
+const { verifyReceipt } = await import('../extension/lib/receipt.js');
+const tsDid = (await (await fetch(L + '/api/timestamp/key')).json()).did;
+await test('website receipt is signed, server-timestamped and verifiable by anyone; tampering is caught', async () => {
+  const r = await ext({ type: 'receipt:create', tabId: await tabIdFor(IP + '/phish-login.html') });
+  assert.ok(!r.error, r.error);
+  const vc = r.result;
+  const v = await verifyReceipt(vc, { timestampDid: tsDid });
+  assert.equal(v.signature, true);
+  assert.equal(v.timestamp.status, 'valid');
+  const statuses = new Set(vc.credentialSubject.checks.map((c) => c.status));
+  assert.ok(statuses.has('found') && statuses.has('na'), 'found + not-applicable rows recorded');
+  assert.ok(vc.credentialSubject.checks.some((c) => /raw IP address/.test(c.detail)));
+  const bad = structuredClone(vc);
+  bad.credentialSubject.verdict.risk = 0;
+  assert.equal((await verifyReceipt(bad, { timestampDid: tsDid })).signature, false);
+});
+await test('image receipt explains why a doctored photo is "altered"', async () => {
+  const feed = await (await fetch(L + '/api/prov/feed')).json();
+  const r = await ext({ type: 'receipt:create', image: L + feed.find((f) => f.kind === 'tampered').url });
+  assert.ok(!r.error, r.error);
+  const rows = r.result.credentialSubject.checks;
+  assert.equal(rows.find((x) => x.label === 'Signature').status, 'good');
+  assert.equal(rows.find((x) => x.label === 'Pixels unchanged since signing').status, 'found');
+  assert.equal((await verifyReceipt(r.result, { timestampDid: tsDid })).timestamp.status, 'valid');
+});
+await test('receipt page renders the evidence inside the extension', async () => {
+  const tabId = await tabIdFor(IP + '/phish-login.html');
+  const pg = await browser.open(`chrome-extension://${browser.extensionId}/pages/receipt.html?tab=${tabId}`);
+  const text = await waitFor(() => pg.eval("document.querySelector('#dl') && document.body.innerText"), { timeout: 20000, what: 'receipt page' });
+  assert.match(text, /Very likely a scam/);
+  assert.match(text, /signature valid/);
+  assert.match(text, /countersigned by the EMCON server/);
 });
 
 await browser.close();

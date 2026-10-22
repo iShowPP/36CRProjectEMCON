@@ -9,14 +9,14 @@
 <body>
   <main>
     <p class="chip">Demo relying party · <span id="origin"></span></p>
-    <h1>🛒 ShopNorth</h1>
+    <h1>ShopNorth</h1>
     <p class="lead">Create an account in one tap. ShopNorth gets cryptographic proof that you're a real, verified human (and optionally 18+), but no email, no phone, no name, and no ID it could share with other sites.</p>
 
     <div class="grid">
       <div class="card stack">
         <h2>Sign in with EMCON Ghost</h2>
         <label><input id="over18" type="checkbox" style="width:auto"> Also prove I'm over 18 (unlocks the 18+ aisle)</label>
-        <button id="go" class="primary">👻 Continue with EMCON Ghost</button>
+        <button id="go" class="primary">Continue with EMCON Ghost</button>
         <div id="status" class="small muted"></div>
         <div id="noext" class="notice warn hidden">EMCON extension not detected. Load <code>extension/</code> as an unpacked extension, then reload this page.</div>
       </div>
@@ -25,12 +25,12 @@
         <h2>Compare: "Sign in with Big Tech"</h2>
         <table>
           <tr><th>Data</th><th>OAuth login</th><th>EMCON Ghost</th></tr>
-          <tr><td>Email</td><td>✅ shared</td><td>— never</td></tr>
-          <tr><td>Name / avatar</td><td>✅ shared</td><td>— never</td></tr>
-          <tr><td>Same ID on every site</td><td>✅ linkable</td><td>— unique per site</td></tr>
-          <tr><td>Provider sees every login</td><td>✅ yes</td><td>— offline; issuer is blind</td></tr>
-          <tr><td>Proves "real human"</td><td>❌ no</td><td>✅ blind token</td></tr>
-          <tr><td>Proves age</td><td>❌ no</td><td>✅ without birthdate</td></tr>
+          <tr><td>Email</td><td>shared</td><td>— never</td></tr>
+          <tr><td>Name / avatar</td><td>shared</td><td>— never</td></tr>
+          <tr><td>Same ID on every site</td><td>linkable</td><td>— unique per site</td></tr>
+          <tr><td>Provider sees every login</td><td>yes</td><td>— offline; issuer is blind</td></tr>
+          <tr><td>Proves "real human"</td><td>no</td><td>blind token</td></tr>
+          <tr><td>Proves age</td><td>no</td><td>without birthdate</td></tr>
         </table>
       </div>
     </div>
@@ -49,10 +49,12 @@
     import { $, esc, api, hubNav, hasExtension } from '/common.js';
     hubNav('/rp.html');
     $('#origin').textContent = location.origin;
-    const cfg = await api('/api/config');
-    const otherBase = location.origin === cfg.alt ? cfg.official : cfg.alt;
-    if (otherBase) { $('#other').href = otherBase + '/rp.html'; $('#other').textContent = otherBase + '/rp.html'; }
-    else $('#other').replaceWith('a second hostname for this server (set EMCON_ALT_URL, or run it locally)');
+    // not awaited: the sign-in button must work before this returns
+    api('/api/config').then((cfg) => {
+      const otherBase = location.origin === cfg.alt ? cfg.official : cfg.alt;
+      if (otherBase) { $('#other').href = otherBase + '/rp.html'; $('#other').textContent = otherBase + '/rp.html'; }
+      else $('#other').replaceWith('a second hostname for this server (set EMCON_ALT_URL, or run it locally)');
+    });
 
     setTimeout(() => { if (!hasExtension()) $('#noext').classList.remove('hidden'); }, 800);
 
@@ -89,9 +91,9 @@
       $('#status').textContent = '';
       $('#result').classList.remove('hidden');
       $('#result').innerHTML = `
-        <h2>${res.newAccount ? '🎉 Account created' : '👋 Welcome back'}, ${esc(a.handle)}</h2>
+        <h2>${res.newAccount ? 'Account created' : 'Welcome back'}, ${esc(a.handle)}</h2>
         <p class="small muted">Logins: ${a.logins} · Claims proven: ${a.claims.map((c) => `<span class="chip ok">${esc(c)}</span>`).join(' ')}
-        ${a.claims.includes('over18') ? ' · 🔓 18+ aisle unlocked' : ''}</p>
+        ${a.claims.includes('over18') ? ' · 18+ aisle unlocked' : ''}</p>
         <h3>Everything ShopNorth now knows about you</h3>
         <pre>${esc(JSON.stringify(res.whatThisSiteKnows, null, 2))}</pre>
         <details><summary class="small">Raw presentation from the extension</summary><pre>${esc(JSON.stringify(p, null, 2))}</pre></details>`;
@@ -105,7 +107,7 @@
 
     $('#go').onclick = async () => {
       $('#go').disabled = true;
-      try { await signIn(); } catch (e) { $('#status').textContent = '⚠️ ' + e.message; } finally { $('#go').disabled = false; }
+      try { await signIn(); } catch (e) { $('#status').textContent = 'Error: ' + e.message; } finally { $('#go').disabled = false; }
     };
     loadAccounts();
   </script>

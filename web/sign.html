@@ -37,10 +37,10 @@
       <h2>What "Build the full demo feed" posts</h2>
       <table>
         <tr><th>Post</th><th>How it's made</th><th>Badge you should see</th></tr>
-        <tr><td>Original</td><td>Signed by the trusted newsroom key</td><td><span class="chip ok">✔ Verified source</span></td></tr>
-        <tr><td>Doctored copy</td><td>Pixels edited, original manifest copied over</td><td><span class="chip bad">✖ Altered after signing</span></td></tr>
-        <tr><td>Re-upload</td><td>Re-encoded as JPEG, all metadata stripped (like social platforms do)</td><td><span class="chip ok">↺ Provenance recovered</span></td></tr>
-        <tr><td>Self-signed</td><td>Signed by a key that isn't on the trust list</td><td><span class="chip warn">? Signed, unknown signer</span></td></tr>
+        <tr><td>Original</td><td>Signed by the trusted newsroom key</td><td><span class="chip ok">Verified · newsroom</span></td></tr>
+        <tr><td>Doctored copy</td><td>Pixels edited, original manifest copied over</td><td><span class="chip bad">Altered after signing</span></td></tr>
+        <tr><td>Re-upload</td><td>Re-encoded as JPEG, all metadata stripped (like social platforms do)</td><td><span class="chip ok">Recovered · newsroom</span></td></tr>
+        <tr><td>Self-signed</td><td>Signed by a key that isn't on the trust list</td><td><span class="chip warn">Signed Â· unknown signer</span></td></tr>
         <tr><td>Unrelated image</td><td>Never signed</td><td>No badge. "No provenance" is <b>not</b> evidence of fake.</td></tr>
       </table>
       <p><a class="btn" href="/feed.html">Open the feed →</a></p>
@@ -99,8 +99,8 @@
       $('#out').textContent = 'Signing…';
       try {
         const r = await sign(bytes, $('#signer').value);
-        $('#out').innerHTML = `✅ Signed. <a href="${r.url}" download>Download signed file</a> · <a href="${r.url}" target="_blank">open</a><pre>${esc(JSON.stringify(r.manifest, null, 2))}</pre>`;
-      } catch (e) { $('#out').textContent = '⚠️ ' + e.message; }
+        $('#out').innerHTML = `Signed. <a href="${r.url}" download>Download signed file</a> · <a href="${r.url}" target="_blank">open</a><pre>${esc(JSON.stringify(r.manifest, null, 2))}</pre>`;
+      } catch (e) { $('#out').textContent = 'Error: ' + e.message; }
     };
 
     $('#demo').onclick = async () => {
@@ -134,8 +134,8 @@
         const plain = scene(800, 500, 1.7); const pg = plain.getContext('2d'); pg.fillStyle = 'rgba(0,0,0,.25)'; pg.fillRect(0, 0, 800, 500);
         await api('/api/prov/upload', { method: 'POST', body: { image: toB64(await blobBytes(await toBlob(plain, 'image/jpeg', 0.9))), caption: 'evening walk 🌄', author: '@sam', kind: 'unsigned' } });
 
-        $('#out').innerHTML = '✅ Feed built. <a href="/feed.html">Open the feed →</a>';
-      } catch (e) { $('#out').textContent = '⚠️ ' + e.message; }
+        $('#out').innerHTML = 'Feed built. <a href="/feed.html">Open the feed →</a>';
+      } catch (e) { $('#out').textContent = 'Error: ' + e.message; }
       $('#demo').disabled = false;
     };
   </script>

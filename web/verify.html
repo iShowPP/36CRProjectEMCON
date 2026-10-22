@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify an EMCON receipt</title>
+  <link rel="stylesheet" href="/style.css">
+  <style> textarea { min-height: 160px; font: 12px/1.5 var(--mono); } dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; } dt { font: 600 10.5px/1.9 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; } </style>
+</head>
+<body>
+  <main>
+    <div class="kicker">Evidence receipts</div>
+    <h1>Verify a receipt</h1>
+    <p class="lead">Someone sent you an EMCON receipt? Check that it's genuine and unchanged, and see exactly what EMCON observed. Checking happens in this page; the file isn't uploaded anywhere.</p>
+    <div class="card stack">
+      <label for="file">Receipt file (.json)</label>
+      <input id="file" type="file" accept="application/json,.json">
+      <label for="json">…or paste its contents</label>
+      <textarea id="json" placeholder='{"@context": …, "type": ["VerifiableCredential", "EmconEvidenceReceipt"], …}'></textarea>
+      <div><button id="go" class="primary">Verify</button></div>
+    </div>
+    <div id="out" class="card hidden"></div>
+  </main>
+  <script type="module">
+    import { $, esc, hubNav } from '/common.js';
+    import { verifyReceipt } from '/lib/receipt.js';
+    hubNav('/verify.html');
+    const STATUS = { found: 'Found', unknown: 'Unknown', good: 'Good', note: 'Note', clear: 'Clear', na: 'N/A', kept: 'Kept', broken: 'Broken', untested: 'Untested' };
+    const rows = (list) => `<ol class="ev">${list.map((r) => `<li class="${r.status}"><span class="tag">${STATUS[r.status] || r.status}</span><div><b>${esc(r.label)}</b><span>${esc(r.detail)}</span></div></li>`).join('')}</ol>`;
+
+    $('#file').onchange = async (e) => { const f = e.target.files[0]; if (f) { $('#json').value = await f.text(); $('#go').click(); } };
+    $('#go').onclick = async () => {
+      const out = $('#out');
+      out.classList.remove('hidden');
+      let vc;
+      try { vc = JSON.parse($('#json').value); } catch { out.innerHTML = '<p class="bad">That is not valid JSON.</p>'; return; }
+      if (!vc?.type?.includes('EmconEvidenceReceipt')) { out.innerHTML = '<p>This is not an EMCON evidence receipt.</p>'; return; }
+      const { did } = await (await fetch('/api/timestamp/key')).json();
+      const r = await verifyReceipt(vc, { timestampDid: did });
+      const s = vc.credentialSubject || {};
+      const ok = r.signature && r.timestamp.status === 'valid';
+      out.innerHTML = `
+        <div class="kicker">${ok ? 'Genuine and unchanged' : r.signature ? 'Signature valid, timestamp not confirmed' : 'Not genuine'}</div>
+        <h2 class="${ok ? 'ok' : r.signature ? 'warn' : 'bad'}" style="font-size:24px">${ok ? 'This receipt checks out.' : r.signature ? 'Signed, but the timestamp could not be confirmed.' : 'This receipt has been altered or forged.'}</h2>
+        <dl style="margin:12px 0 18px">
+          <dt>Subject</dt><dd class="mono">${esc(s.id)}</dd>
+          <dt>Kind</dt><dd>${esc(s.kind)}</dd>
+          <dt>Signature</dt><dd>${r.signature ? '<span class="ok">valid</span>' : '<span class="bad">invalid: the content was changed after signing</span>'}, key <span class="mono">${esc(r.signer)}</span></dd>
+          <dt>Timestamp</dt><dd>${r.timestamp.status === 'valid' ? `<span class="ok">${esc(new Date(r.timestamp.time).toLocaleString())}</span>, countersigned by this EMCON server` : r.timestamp.status === 'missing' ? '<span class="warn">none (self-timestamped only)</span>' : `<span class="bad">does not verify</span>${r.timestamp.known === false ? ' (signed by a different server)' : ''}`}</dd>
+          ${s.verdict?.level ? `<dt>Verdict</dt><dd>${esc(s.verdict.level)}, risk ${s.verdict.risk}/100</dd>` : s.verdict?.summary ? `<dt>Verdict</dt><dd>${esc(s.verdict.summary)}</dd>` : ''}
+        </dl>
+        ${r.signature && Array.isArray(s.checks) ? `<h3>Evidence recorded</h3>${rows(s.checks)}` : ''}
+        ${r.signature && s.privacy ? `<h3 style="margin-top:16px">Privacy promises</h3>${rows(s.privacy.promises.map((p) => ({ status: p.status, label: p.promise, detail: p.evidence })))}` : ''}
+        <p class="small muted" style="margin-top:12px">A valid receipt proves what EMCON observed and when. It is not, on its own, proof that a site is a scam.</p>`;
+    };
+  </script>
+</body>
+</html>

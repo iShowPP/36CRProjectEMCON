@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuickKart Rewards: claim your gift card</title>
+  <!-- DEMO SCAM PAGE for the scam-chain demo. "QuickKart" is fictional; nothing typed here is stored. -->
+  <style>
+    body { margin: 0; font: 15px/1.5 Arial, sans-serif; background: #fff7e6; color: #222; }
+    .top { background: #ffb300; padding: 14px 20px; font-weight: 800; font-size: 20px; }
+    .box { max-width: 460px; margin: 28px auto; background: #fff; border: 1px solid #f0d9a8; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    .timer { color: #c00; font-weight: 700; }
+    label { display: block; font-size: 13px; margin: 12px 0 4px; }
+    input { width: 100%; padding: 9px; border: 1px solid #ccc; box-sizing: border-box; font-size: 15px; }
+    .two { display: flex; gap: 10px; } .two > div { flex: 1; }
+    button { margin-top: 18px; width: 100%; padding: 12px; background: #e65100; color: #fff; border: 0; font-size: 16px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="top">QuickKart Rewards</div>
+  <div class="box">
+    <h1>Congratulations! You have won a ₹50,000 gift card</h1>
+    <p>Claim your gift card within 24 hours. <span class="timer">Offer expires today.</span> A refundable processing fee of ₹49 will be charged to verify your card.</p>
+    <form action="/phish-caught.html" method="get">
+      <label for="name">Full name</label><input id="name" name="name">
+      <label for="mobile">Mobile number</label><input id="mobile" name="mobile" type="tel">
+      <label for="card">Card number</label><input id="card" name="card_number" autocomplete="cc-number" inputmode="numeric">
+      <div class="two">
+        <div><label for="exp">Expiry (MM/YY)</label><input id="exp" name="expiry" autocomplete="cc-exp"></div>
+        <div><label for="cvv">CVV</label><input id="cvv" name="cvv" autocomplete="cc-csc" inputmode="numeric"></div>
+      </div>
+      <label for="otp">OTP sent to your mobile</label><input id="otp" name="otp" autocomplete="one-time-code" inputmode="numeric">
+      <button type="submit">Claim my gift card</button>
+    </form>
+  </div>
+</body>
+</html>

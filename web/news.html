@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Daily Ledger</title>
+  <!-- The site's machine-readable privacy promise, which EMCON checks against what the page actually does. -->
+  <meta name="privacy-promise" content="no-third-party-tracking respects-consent">
+  <!-- DEMO PAGE for the privacy promise monitor: it is built to break its own promise.
+       The "ad network" domain is reserved (.example) and never resolves; no real tracker is contacted. -->
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .paper { max-width: 720px; margin: 0 auto; }
+    .mast { text-align: center; border-bottom: 3px double var(--ink); padding-bottom: 10px; margin-bottom: 18px; }
+    .mast h1 { font-size: 44px; margin: 0; }
+    article p { font: 18px/1.65 var(--serif); }
+    .banner { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 720px; margin: 0 auto; background: var(--sheet); border: 1px solid var(--rule); border-top: 3px solid var(--ink); padding: 16px 18px; }
+    .side { border-left: 3px solid var(--signal); padding-left: 12px; margin-top: 28px; }
+  </style>
+</head>
+<body>
+  <main class="paper">
+    <div class="mast"><div class="kicker">Est. 1891 · Demo newspaper</div><h1>The Daily Ledger</h1><div class="small muted">"We respect your privacy. No third-party tracking, and we honour your choices."</div></div>
+    <article>
+      <h2>City council approves riverside flood barrier</h2>
+      <p>After three years of debate, the council voted 7–2 on Tuesday to fund a two-kilometre flood barrier along the riverside highway, which closed twice last monsoon.</p>
+      <p>The barrier will be built in stages starting next spring. Residents near the eastern bank will be consulted on access points before construction begins.</p>
+    </article>
+    <div class="side small">
+      <div class="kicker">Try the privacy promise monitor</div>
+      <p>This page declares the promise <code>no-third-party-tracking respects-consent</code> in a <code>&lt;meta name="privacy-promise"&gt;</code> tag. Click <b>Reject all</b> on the cookie banner, then open the EMCON toolbar icon → <b>Privacy</b>. EMCON lists the tracker requests and canvas fingerprinting that happened anyway, before and after you said no.</p>
+    </div>
+  </main>
+
+  <div class="banner" id="banner">
+    <b>Your privacy matters to us.</b> We use cookies to improve your experience.
+    <div class="row" style="margin-top:10px"><button id="accept" class="primary">Accept all</button><button id="reject">Reject all</button></div>
+  </div>
+
+  <script type="module">
+    import { hubNav } from '/common.js';
+    hubNav('/news.html');
+    // Breaks "no third-party tracking" immediately, before any consent decision.
+    new Image().src = 'https://pixel.adnetwork-demo.example/p.gif?page=home';
+    const hide = () => { document.getElementById('banner').remove(); };
+    document.getElementById('accept').onclick = hide;
+    document.getElementById('reject').onclick = () => {
+      hide();
+      // Breaks "respects consent": keeps tracking after you said no.
+      setTimeout(() => {
+        new Image().src = 'https://collect.adnetwork-demo.example/c?ev=after_reject';
+        navigator.sendBeacon?.('https://collect.adnetwork-demo.example/b', 'ev=after_reject');
+        const c = document.createElement('canvas');
+        c.width = 200; c.height = 40;
+        const g = c.getContext('2d');
+        g.font = '16px serif'; g.fillText('fingerprint', 4, 24);
+        c.toDataURL(); // canvas fingerprinting
+      }, 600);
+    };
+  </script>
+</body>
+</html>

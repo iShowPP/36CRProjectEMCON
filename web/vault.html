@@ -17,7 +17,7 @@
 </head>
 <body>
   <main>
-    <h1>🏦 Kestrel Bank · Honey-Vault</h1>
+    <h1>Kestrel Bank · Honey-Vault</h1>
     <p class="lead">Online banking with built-in scam brakes: risk-scaled cooling-off, scam-script check-ins, guardian co-signing, a duress PIN, and time-locked settings.</p>
 
     <section id="login" class="card stack" style="max-width:420px">
@@ -35,7 +35,7 @@
           <div class="muted small">Available balance</div>
           <div class="balance" id="balance">—</div>
           <div id="freezeVault" class="small muted"></div>
-          <div class="row"><button id="freeze" class="danger">🧊 Panic freeze</button><button id="logout">Log out</button></div>
+          <div class="row"><button id="freeze" class="danger">Panic freeze</button><button id="logout">Log out</button></div>
         </div>
         <div class="card stack">
           <h2>Send money</h2>
@@ -90,9 +90,9 @@
     </section>
 
     <section class="card stack" style="margin-top:16px">
-      <h2>🎬 Demo controls</h2>
+      <h2>Demo controls</h2>
       <div class="row">
-        <button data-ff="15">⏩ +15 min</button><button data-ff="60">⏩ +1 h</button><button data-ff="1500">⏩ +25 h</button>
+        <button data-ff="15">+15 min</button><button data-ff="60">+1 h</button><button data-ff="1500">+25 h</button>
         <button id="reset">Reset vault</button>
       </div>
       <div id="guardianLinks" class="small"></div>
@@ -121,10 +121,10 @@
     function render() {
       const s = state, clock = s.clock;
       $('#balance').textContent = money(s.balance);
-      $('#freezeVault').textContent = s.freezeVault ? `🔒 ${money(s.freezeVault)} held in the freeze vault` : '';
+      $('#freezeVault').textContent = s.freezeVault ? `${money(s.freezeVault)} held in the freeze vault` : '';
       const b = [];
-      if (s.frozen) b.push('<div class="notice bad">🧊 Account frozen. Outgoing transfers are halted. Only a guardian can unfreeze it.</div>');
-      if (s.duressActive) b.push('<div class="notice bad">🚨 A duress episode is active. Money sent from the decoy session is in the freeze vault. Guardians must close the episode to return it.</div>');
+      if (s.frozen) b.push('<div class="notice bad">Account frozen. Outgoing transfers are halted. Only a guardian can unfreeze it.</div>');
+      if (s.duressActive) b.push('<div class="notice bad">A duress episode is active. Money sent from the decoy session is in the freeze vault. Guardians must close the episode to return it.</div>');
       $('#banners').innerHTML = b.join('');
       const picked = $('#payee').value;
       $('#payee').innerHTML = s.payees.map((p) => `<option value="${p.id}">${esc(p.name)}${p.isNew ? ' (new)' : ''}</option>`).join('');
@@ -135,7 +135,7 @@
         $('#settings').innerHTML = Object.entries(LABELS).map(([k, l]) => `<div class="row"><label style="flex:1;margin:0" for="s_${k}">${l}</label><input id="s_${k}" data-k="${k}" type="number" style="width:110px" value="${s.settings[k]}"></div>`).join('');
         $('#settings').dataset.filled = 1;
       }
-      $('#pendingSettings').innerHTML = s.pendingSettings.map((p) => `<div class="notice warn" style="margin-top:6px">⏳ ${LABELS[p.key]}: ${p.from} → ${p.to}, effective in ${until(p.effectiveAt, clock)} <button data-cancel-setting="${p.id}">Cancel</button></div>`).join('');
+      $('#pendingSettings').innerHTML = s.pendingSettings.map((p) => `<div class="notice warn" style="margin-top:6px">${LABELS[p.key]}: ${p.from} → ${p.to}, effective in ${until(p.effectiveAt, clock)} <button data-cancel-setting="${p.id}">Cancel</button></div>`).join('');
       $('#alerts').innerHTML = s.alerts.length ? s.alerts.map((a) => `<div class="alert-${a.level}">• <span class="muted">${ago(a.at, clock)}</span> ${esc(a.text)}</div>`).join('') : '<span class="muted">None.</span>';
     }
 
@@ -146,7 +146,7 @@
       if (open) {
         extra += `<div class="small muted">Releases in ${until(t.releaseAt, clock)}${t.needsGuardians ? ` · guardian approvals ${t.approvals}/${t.required}` : ''}${t.quiz ? ' · check-in done' : ' · <b>check-in required</b>'}</div>`;
         if (!t.quiz) extra += `<div class="quiz" data-quiz="${t.id}"><b class="small">Quick safety check-in. Scammers often coach people through payments like this one.</b>${quiz.map((q) => `<div class="q">${esc(q.q)}<br><label><input type="radio" name="${t.id}_${q.id}" value="yes"> Yes</label><label><input type="radio" name="${t.id}_${q.id}" value="no"> No</label></div>`).join('')}<button data-submit-quiz="${t.id}">Submit</button></div>`;
-        else if (t.quiz.flags.length) extra += `<div class="notice warn small" style="margin-top:6px">⚠️ You answered yes to ${t.quiz.flags.length} warning sign(s). This matches a common scam script, so the payment now needs your guardians. <b>Real banks, police and tax offices never ask you to move money to "keep it safe".</b></div>`;
+        else if (t.quiz.flags.length) extra += `<div class="notice warn small" style="margin-top:6px">You answered yes to ${t.quiz.flags.length} warning sign(s). This matches a common scam script, so the payment now needs your guardians. <b>Real banks, police and tax offices never ask you to move money to "keep it safe".</b></div>`;
         extra += `<div class="row" style="margin-top:6px"><button data-cancel="${t.id}">Cancel payment</button></div>`;
       }
       const reasons = t.risk?.reasons?.length ? `<ul class="reasons">${t.risk.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : '';
@@ -155,7 +155,7 @@
 
     $('#doLogin').onclick = async () => {
       try { ({ token } = await api('/api/vault/login', { method: 'POST', body: { pin: $('#pin').value } })); sessionStorage.setItem('vaultToken', token); $('#pin').value = ''; $('#loginMsg').textContent = ''; refresh(); }
-      catch (e) { $('#loginMsg').textContent = '⚠️ ' + e.message; }
+      catch (e) { $('#loginMsg').textContent = 'Error: ' + e.message; }
     };
     $('#pin').onkeydown = (e) => e.key === 'Enter' && $('#doLogin').click();
     $('#logout').onclick = () => { token = null; sessionStorage.removeItem('vaultToken'); show(false); };
@@ -165,11 +165,11 @@
         const r = await api('/api/vault/transfer', { method: 'POST', ...auth(), body: { payeeId: $('#payee').value, amount: $('#amount').value, pin: $('#tpin').value, memo: $('#memo').value } });
         $('#tpin').value = '';
         const t = r.tx;
-        $('#sendMsg').innerHTML = t.status === 'completed' ? `✅ Sent. Reference ${t.ref}.`
-          : t.status === 'cooling' ? `⏳ Scheduled. To protect you, this payment has a ${until(t.releaseAt, state?.clock || Date.now())} cooling-off period. Complete the check-in below.`
-          : `🛡️ Held. This payment needs ${t.required} guardian approvals plus a cooling-off period. Complete the check-in below.`;
+        $('#sendMsg').innerHTML = t.status === 'completed' ? `Sent. Reference ${t.ref}.`
+          : t.status === 'cooling' ? `Scheduled. To protect you, this payment has a ${until(t.releaseAt, state?.clock || Date.now())} cooling-off period. Complete the check-in below.`
+          : `Held. This payment needs ${t.required} guardian approvals plus a cooling-off period. Complete the check-in below.`;
         state = r.state; render();
-      } catch (e) { $('#sendMsg').textContent = '⚠️ ' + e.message; }
+      } catch (e) { $('#sendMsg').textContent = 'Error: ' + e.message; }
     };
 
     document.addEventListener('click', async (e) => {
@@ -187,17 +187,17 @@
 
     $('#freeze').onclick = async () => { state = await api('/api/vault/freeze', { method: 'POST', ...auth() }); render(); };
     $('#addPayee').onclick = async () => {
-      try { state = await api('/api/vault/payees', { method: 'POST', ...auth(), body: { name: $('#pname').value, account: $('#pacct').value, domain: $('#pdomain').value, pin: $('#ppin').value } }); $('#payeeMsg').textContent = '✅ Added. New payees get extra protection for the first 24 h.'; $('#ppin').value = ''; render(); }
-      catch (e) { $('#payeeMsg').textContent = '⚠️ ' + e.message; }
+      try { state = await api('/api/vault/payees', { method: 'POST', ...auth(), body: { name: $('#pname').value, account: $('#pacct').value, domain: $('#pdomain').value, pin: $('#ppin').value } }); $('#payeeMsg').textContent = 'Added. New payees get extra protection for the first 24 h.'; $('#ppin').value = ''; render(); }
+      catch (e) { $('#payeeMsg').textContent = 'Error: ' + e.message; }
     };
     $('#saveSettings').onclick = async () => {
       const changes = Object.fromEntries($$('#settings input').map((i) => [i.dataset.k, i.value]));
       try {
         const r = await api('/api/vault/settings', { method: 'POST', ...auth(), body: { pin: $('#spin').value, changes } });
         $('#spin').value = '';
-        $('#settingsMsg').innerHTML = [r.applied?.length ? `✅ Applied now: ${r.applied.join(', ')}` : '', r.delayed?.length ? `⏳ Time-locked: ${r.delayed.map((d) => d.key).join(', ')}` : ''].filter(Boolean).join('<br>') || 'No changes.';
+        $('#settingsMsg').innerHTML = [r.applied?.length ? `Applied now: ${r.applied.join(', ')}` : '', r.delayed?.length ? `Time-locked: ${r.delayed.map((d) => d.key).join(', ')}` : ''].filter(Boolean).join('<br>') || 'No changes.';
         state = r.state; $('#settings').dataset.filled = ''; render();
-      } catch (e) { $('#settingsMsg').textContent = '⚠️ ' + e.message; }
+      } catch (e) { $('#settingsMsg').textContent = 'Error: ' + e.message; }
     };
     $('#reset').onclick = async () => { await api('/api/vault/demo/reset', { method: 'POST' }); token = null; sessionStorage.removeItem('vaultToken'); $('#settings').dataset.filled = ''; show(false); loadDemo(); };
 

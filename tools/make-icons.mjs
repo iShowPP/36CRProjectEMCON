@@ -15,33 +15,34 @@ function insideShield(x, y) {
   return Math.abs(x - 0.5) <= w;
 }
 
-function distToSegment(px, py, [ax, ay], [bx, by]) {
-  const dx = bx - ax, dy = by - ay;
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
-const CHECK = [[0.31, 0.5], [0.45, 0.64], [0.7, 0.36]];
-const onCheck = (x, y) => distToSegment(x, y, CHECK[0], CHECK[1]) < 0.065 || distToSegment(x, y, CHECK[1], CHECK[2]) < 0.065;
+// Same outline scaled about the centre, used for the thin inner line.
+const insideInset = (x, y, k) => insideShield(0.5 + (x - 0.5) / k, 0.5 + (y - 0.5) / k);
+
+const INK = [0x17, 0x17, 0x1a], PAPER = [0xf5, 0xf2, 0xeb], SIGNAL = [0xc2, 0x41, 0x0c];
 
 function render(size) {
   const SS = 4; // supersampling for anti-aliased edges
+  const line = size >= 32; // the inner line only reads at larger sizes
   const rows = [];
   for (let py = 0; py < size; py++) {
     const row = Buffer.alloc(1 + size * 4);
     for (let px = 0; px < size; px++) {
-      let cover = 0, white = 0;
+      let cover = 0;
+      const acc = [0, 0, 0];
       for (let sy = 0; sy < SS; sy++) {
         for (let sx = 0; sx < SS; sx++) {
           const x = (px + (sx + 0.5) / SS) / size, y = (py + (sy + 0.5) / SS) / size;
-          if (insideShield(x, y)) { cover++; if (onCheck(x, y)) white++; }
+          if (!insideShield(x, y)) continue;
+          cover++;
+          // flat ink shield, a paper inner outline, one signal-orange bar
+          const bar = y > 0.43 && y < 0.53 && Math.abs(x - 0.5) < 0.2;
+          const inner = line && insideInset(x, y, 0.8) && !insideInset(x, y, 0.72);
+          const c = bar ? SIGNAL : inner ? PAPER : INK;
+          acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2];
         }
       }
-      const a = cover / (SS * SS);
-      const w = cover ? white / cover : 0;
-      const g = py / size; // vertical gradient #3d6bff -> #1f3fbf
-      const base = [0x3d + (0x1f - 0x3d) * g, 0x6b + (0x3f - 0x6b) * g, 0xff + (0xbf - 0xff) * g];
-      const rgb = base.map((c) => Math.round(c * (1 - w) + 255 * w));
-      row.set([...rgb, Math.round(a * 255)], 1 + px * 4);
+      const rgb = cover ? acc.map((v) => Math.round(v / cover)) : INK;
+      row.set([...rgb, Math.round((cover / (SS * SS)) * 255)], 1 + px * 4);
     }
     rows.push(row);
   }
