@@ -5,82 +5,140 @@
   <title>EMCON</title>
   <link rel="stylesheet" href="pages.css">
   <style>
-    body { width: 410px; }
-    header { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 0; }
-    header img { width: 18px; height: 18px; align-self: center; }
-    header .word { font: 600 19px var(--serif); }
-    header .host { margin-left: auto; font: 11.5px var(--mono); color: var(--muted); max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    nav { display: flex; gap: 14px; padding: 10px 16px 0; border-bottom: 1px solid var(--rule); }
-    nav button { border: 0; background: none; padding: 6px 0 8px; font: 600 12.5px var(--sans); color: var(--muted); border-bottom: 2px solid transparent; border-radius: 0; }
-    nav button.on { color: var(--ink); border-bottom-color: var(--ink); }
-    main { padding: 12px 16px 14px; max-height: 540px; overflow: auto; }
-    .verdict h1 { font-size: 22px; }
-    .num { font: 600 22px var(--serif); }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin: 8px 0 10px; }
-    .stats div { background: var(--sheet); padding: 8px 10px; }
-    details summary { cursor: pointer; font: 600 12.5px var(--sans); padding: 6px 0; }
+    html, body { width: 400px; height: 600px; overflow: hidden; }
+    .app { display: flex; flex-direction: column; height: 100%; }
+    header.top { display: flex; align-items: center; gap: 9px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    header.top img { width: 22px; height: 22px; }
+    @media (prefers-color-scheme: dark) { header.top img { background: #f5f2eb; border-radius: 6px; padding: 2px; width: 24px; height: 24px; } }
+    header.top .word { font-size: 16px; font-weight: 750; letter-spacing: .02em; }
+    header.top .site { margin-left: auto; max-width: 220px; padding: 4px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    header.top .site:empty { display: none; }
+    main { flex: 1; overflow-y: auto; padding: 14px 14px 18px; scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+    nav.tabs { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); }
+    nav.tabs button { flex-direction: column; gap: 3px; min-height: 58px; padding: 8px 2px 7px; border: 0; border-radius: 0; background: none; color: var(--text-3); font-size: 12px; font-weight: 600; }
+    nav.tabs button:hover { background: var(--surface-2); color: var(--text-2); }
+    nav.tabs button.on { color: var(--primary); }
+    nav.tabs button.on .ic { stroke-width: 2.4; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .actions .wide { grid-column: 1 / -1; }
+    .list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+    .list > button { width: 100%; justify-content: flex-start; gap: 12px; min-height: 60px; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: none; text-align: left; font-weight: 400; }
+    .list > button:last-child { border-bottom: 0; }
+    .list > button:hover { background: var(--surface-2); }
+    .list .li-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--primary-tint); color: var(--primary); flex: none; }
+    .list .li-txt { flex: 1; min-width: 0; } .list .li-txt b { display: block; font-weight: 650; } .list .li-txt span { font-size: 12.5px; color: var(--text-2); }
+    .list .chev { color: var(--text-3); }
+    .subhead { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px -6px; }
+    .subhead h2 { font-size: 17px; }
+    .week { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 8px; margin-top: 8px; }
+    .week div { padding: 6px 0; } .week b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; } .week span { font-size: 12px; color: var(--text-2); }
+    .empty { text-align: center; padding: 28px 12px; color: var(--text-2); }
+    .empty .dot-icon { margin: 0 auto 10px; }
+    .stat-row { display: flex; gap: 8px; margin-top: 12px; }
+    .stat-row > div { flex: 1; padding: 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--l, var(--border)); }
+    .stat-row b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--c, var(--text)); }
+    .stat-row span { font-size: 12px; color: var(--text-2); }
+    .src { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .src:last-child { border-bottom: 0; }
+    .src > div { flex: 1; min-width: 0; } .src b { display: block; font-weight: 650; } .src span { font-size: 12.5px; color: var(--text-2); }
   </style>
 </head>
 <body>
-  <header><img src="../icons/icon32.png" alt=""><span class="word">EMCON</span><span class="host" id="host"></span></header>
-  <nav>
-    <button data-tab="site" class="on">This site</button>
-    <button data-tab="privacy">Privacy</button>
-    <button data-tab="ghost">Ghost</button>
-    <button data-tab="trust">Trust</button>
-    <button data-tab="settings">Settings</button>
-  </nav>
-  <main>
-    <section id="tab-site">
-      <div id="verdict" class="verdict"><p class="muted">No analysis for this tab yet. Reload the page.</p></div>
-      <details id="msgBox" style="margin-top:10px">
-        <summary>Got here from a message? Paste it</summary>
-        <p class="small muted">EMCON never reads your messages. If you paste one here, it stays in this browser and is checked together with the path that led to this page.</p>
-        <textarea id="msg" placeholder="Paste the SMS, WhatsApp or email text"></textarea>
-        <div class="row" style="margin-top:6px"><button id="msgGo">Check with this message</button><span id="msgOut" class="small muted"></span></div>
-      </details>
-      <hr>
-      <div class="row">
-        <button id="receipt" class="primary">Export signed receipt</button>
-        <button id="attGood">I used this site safely</button>
-        <button id="attScam" class="danger">Report scam</button>
-      </div>
-      <div id="attMsg" class="small" style="margin-top:6px"></div>
-    </section>
+  <div class="app">
+    <header class="top"><img src="../icons/icon32.png" alt=""><span class="word">EMCON</span><span class="site" id="host"></span></header>
+    <main id="main">
+      <section id="tab-site">
+        <div id="verdict"></div>
+        <div class="section-title">On this page</div>
+        <div class="tiles" id="tiles"></div>
+        <details class="more" id="msgBox" style="margin-top:6px">
+          <summary><span class="row" style="gap:8px"><span data-icon="message"></span>Got here from a message? Paste it</span><span data-icon="chevronDown"></span></summary>
+          <p class="small muted">EMCON never reads your messages. What you paste stays on this computer and is checked together with the path that led here.</p>
+          <textarea id="msg" placeholder="Paste the SMS, WhatsApp or email text"></textarea>
+          <div class="row" style="margin-top:8px"><button id="msgGo">Check with this message</button><span id="msgOut" class="small muted"></span></div>
+        </details>
+        <div class="actions">
+          <button id="receipt" class="primary wide"><span data-icon="receipt"></span>Save signed proof of this check</button>
+          <button id="attScam" class="danger"><span data-icon="flag"></span>Report scam</button>
+          <button id="attGood"><span data-icon="thumb"></span>I used it safely</button>
+        </div>
+        <div id="attMsg" class="small" style="margin-top:8px"></div>
+      </section>
 
-    <section id="tab-privacy" class="hidden"><div id="privacy"><p class="muted">Nothing observed yet. Reload the page.</p></div></section>
+      <section id="tab-check" class="hidden">
+        <h2 style="font-size:18px">Check a message or link</h2>
+        <p class="small muted" style="margin:4px 0 10px">Got a suspicious SMS, WhatsApp message or email? Paste it. EMCON follows the link for you, without opening it.</p>
+        <textarea id="chk" placeholder="e.g. Your parcel is on hold. Pay the ₹25 customs fee: https://bit.ly/…"></textarea>
+        <button id="chkGo" class="primary block" style="margin-top:8px"><span data-icon="shieldCheck"></span>Check safely</button>
+        <p class="tiny faint" style="margin:8px 2px 0">Only the link goes to the EMCON server. The message text stays on this computer.</p>
+        <div id="chkOut" class="small" style="margin-top:8px"></div>
+        <div id="chkResult" style="margin-top:6px"></div>
+      </section>
 
-    <section id="tab-ghost" class="hidden"><div id="ghost"></div></section>
+      <section id="tab-privacy" class="hidden"><div id="privacy"></div></section>
 
-    <section id="tab-trust" class="hidden">
-      <div class="kicker">Your identity</div>
-      <div class="mono" id="myDid" style="margin:4px 0 6px"></div>
-      <button id="copyDid">Copy my DID</button>
-      <p class="small muted" style="margin-top:6px">Give this to friends so they can add you to their web of trust.</p>
-      <hr>
-      <div class="kicker">People and sources you trust</div>
-      <div id="roots" class="small" style="margin-top:4px"></div>
-      <label for="tDid">Add a person (did:key)</label><input id="tDid" placeholder="did:key:z6Mk…">
-      <div class="row">
-        <div style="flex:1"><label for="tLabel">Name</label><input id="tLabel" placeholder="e.g. Asha"></div>
-        <div style="width:90px"><label for="tWeight">Trust 0–1</label><input id="tWeight" type="number" min="0.05" max="1" step="0.05" value="0.7"></div>
-      </div>
-      <div class="toggle"><span class="small">Publish a signed vouch (friends of friends benefit)</span><input id="tPublish" type="checkbox" checked></div>
-      <button id="tAdd" class="primary">Trust</button>
-      <div id="tMsg" class="small"></div>
-    </section>
+      <section id="tab-more" class="hidden">
+        <div id="more-home">
+          <div class="card">
+            <div class="label">EMCON this week</div>
+            <div class="week" id="week"></div>
+          </div>
+          <div class="list" style="margin-top:12px">
+            <button data-view="ghost"><span class="li-ic" data-icon="ghost"></span><span class="li-txt"><b>Ghost sign-in</b><span id="ghostSub">Sign up without your email or phone</span></span><span class="chev" data-icon="chevron"></span></button>
+            <button data-view="trust"><span class="li-ic" data-icon="users"></span><span class="li-txt"><b>People and sources you trust</b><span id="trustSub">Whose scam reports count for you</span></span><span class="chev" data-icon="chevron"></span></button>
+            <button data-view="settings"><span class="li-ic" data-icon="settings"></span><span class="li-txt"><b>Settings</b><span>Turn protections on or off</span></span><span class="chev" data-icon="chevron"></span></button>
+          </div>
+        </div>
 
-    <section id="tab-settings" class="hidden">
-      <div class="toggle"><span>Anti-fingerprinting on all sites</span><input type="checkbox" id="s_farble"></div>
-      <div class="toggle"><span>Turn off fingerprint protection on this site</span><input type="checkbox" id="s_exception"></div>
-      <div class="toggle"><span>Privacy promise monitor</span><input type="checkbox" id="s_privacy"></div>
-      <div class="toggle"><span>Provenance badges on images</span><input type="checkbox" id="s_provenance"></div>
-      <div class="toggle"><span>Recover provenance of stripped images</span><input type="checkbox" id="s_provRecovery"></div>
-      <div class="toggle"><span>Phishing, look-alike and scam-chain checks</span><input type="checkbox" id="s_wot"></div>
-      <label for="s_server">EMCON server</label><input id="s_server">
-      <p class="small muted" style="margin-top:6px">Changes apply on the next page load.</p>
-    </section>
-  </main>
+        <div id="view-ghost" class="hidden">
+          <div class="subhead"><button class="ghost sm" data-back><span data-icon="back"></span></button><h2>Ghost sign-in</h2></div>
+          <div id="ghost"></div>
+        </div>
+
+        <div id="view-trust" class="hidden">
+          <div class="subhead"><button class="ghost sm" data-back><span data-icon="back"></span></button><h2>People and sources you trust</h2></div>
+          <p class="small muted">Scam reports count only when they come from these, or from people they trust. Strangers can't game it.</p>
+          <div class="card" style="padding:4px 14px"><div id="roots"></div></div>
+          <div class="section-title">Add a person</div>
+          <div class="card">
+            <label for="tLabel" style="margin-top:0">Name</label><input id="tLabel" placeholder="e.g. Asha (my sister)">
+            <label for="tDid">Their EMCON ID</label><input id="tDid" placeholder="did:key:z6Mk…" class="mono">
+            <label for="tWeight">How much do you trust them?</label>
+            <select id="tWeight"><option value="1">Completely</option><option value="0.7" selected>A lot</option><option value="0.4">Somewhat</option></select>
+            <div class="setting" style="border:0;padding-bottom:0"><div><b>Share my vouch</b><span>Signed and published, so friends of friends benefit</span></div><input id="tPublish" type="checkbox" class="switch" checked></div>
+            <button id="tAdd" class="primary block" style="margin-top:12px">Add to my trust network</button>
+            <div id="tMsg" class="small" style="margin-top:6px"></div>
+          </div>
+          <details class="more" style="margin-top:8px">
+            <summary>My EMCON ID (to share with family) <span data-icon="chevronDown"></span></summary>
+            <div class="mono" id="myDid" style="margin-bottom:8px"></div>
+            <button id="copyDid" class="sm"><span data-icon="copy"></span>Copy my ID</button>
+          </details>
+        </div>
+
+        <div id="view-settings" class="hidden">
+          <div class="subhead"><button class="ghost sm" data-back><span data-icon="back"></span></button><h2>Settings</h2></div>
+          <div class="card" style="padding:2px 14px">
+            <div class="setting"><div><b>Scam and phishing checks</b><span>Blocks fake login pages, look-alike addresses and live phishing sites</span></div><input type="checkbox" class="switch" id="s_wot"></div>
+            <div class="setting"><div><b>Photo labels</b><span>Shows who signed a photo and whether it was changed</span></div><input type="checkbox" class="switch" id="s_provenance"></div>
+            <div class="setting"><div><b>Recover stripped photos</b><span>Matches re-uploaded copies to signed originals, on this computer</span></div><input type="checkbox" class="switch" id="s_provRecovery"></div>
+            <div class="setting"><div><b>Privacy promise monitor</b><span>Records which companies track you and checks the site's promises</span></div><input type="checkbox" class="switch" id="s_privacy"></div>
+            <div class="setting"><div><b>Send "do not sell or share"</b><span>Global Privacy Control signal to every site</span></div><input type="checkbox" class="switch" id="s_gpc"></div>
+            <div class="setting"><div><b>Anti-fingerprinting</b><span>Invisible noise so sites can't recognise your device</span></div><input type="checkbox" class="switch" id="s_farble"></div>
+            <div class="setting"><div><b>Pause fingerprint protection here</b><span id="exceptionSub">Only if this site misbehaves</span></div><input type="checkbox" class="switch" id="s_exception"></div>
+          </div>
+          <label for="s_server">EMCON server</label><input id="s_server" class="mono">
+          <p class="tiny faint" style="margin-top:8px">Changes apply the next time a page loads.</p>
+        </div>
+      </section>
+    </main>
+    <nav class="tabs">
+      <button data-tab="site" class="on"><span data-icon="home"></span>This site</button>
+      <button data-tab="check"><span data-icon="message"></span>Check message</button>
+      <button data-tab="privacy"><span data-icon="eye"></span>Privacy</button>
+      <button data-tab="more"><span data-icon="more"></span>More</button>
+    </nav>
+  </div>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

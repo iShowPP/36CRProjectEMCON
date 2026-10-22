@@ -1,4 +1,7 @@
 import { send, $, esc } from './msg.js';
+import { fillIcons } from './ui.js';
+
+fillIcons();
 
 async function check() {
   const { server } = await send({ type: 'settings:get' });
@@ -8,14 +11,14 @@ async function check() {
     const r = await fetch(server + '/api/wot/groups', { credentials: 'omit' });
     const groups = await r.json();
     if (!r.ok || !Array.isArray(groups)) throw new Error('not an EMCON server');
-    $('#status').innerHTML = `<span class="ok">Connected.</span> Following ${groups.map((g) => esc(g.name)).join(', ')} for scam reports.`;
+    $('#status').innerHTML = `<span class="ok" style="font-weight:650">Connected.</span> Following ${groups.map((g) => esc(g.name)).join(', ')} for scam reports.`;
     $('#t-wot').textContent = 'active now';
-    $('#t-wot').className = 'tag ok';
+    $('#t-wot').className = 'pill role-safe';
   } catch (e) {
     $('#status').innerHTML = `<span class="bad">Can't reach ${esc(server)}</span> (${esc(e.message)}). Enter your EMCON server's address above.`;
   }
   const g = await send({ type: 'ghost:status' }).catch(() => null);
-  if (g?.enrolled) { $('#t-ghost').textContent = 'active now'; $('#t-ghost').className = 'tag ok'; $('#ghost').classList.add('hidden'); }
+  if (g?.enrolled) { $('#t-ghost').textContent = 'active now'; $('#t-ghost').className = 'pill role-safe'; $('#ghost').classList.add('hidden'); }
 }
 
 $('#check').onclick = async () => {

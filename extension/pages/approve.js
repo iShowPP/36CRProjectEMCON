@@ -1,4 +1,7 @@
 import { send, $, esc } from './msg.js';
+import { fillIcons } from './ui.js';
+
+fillIcons();
 
 const id = new URLSearchParams(location.search).get('id');
 const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));

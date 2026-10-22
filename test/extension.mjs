@@ -3,6 +3,7 @@
 // through the actual UI: content script, service worker, consent window, badges, block page.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { launchBrowser, waitFor, sleep } from '../tools/browser.mjs';
@@ -130,17 +131,43 @@ await test('a different site gets a different, unlinkable pseudonym', async () =
   assert.notEqual(handleB, handleA);
 });
 
-console.log('\nShield 1b · Anti-fingerprinting');
-const draw = `(() => { const c = document.createElement('canvas'); c.width = 220; c.height = 50; const g = c.getContext('2d');
-  g.font = '18px Arial'; g.fillStyle = '#f60'; g.fillRect(0, 0, 130, 40); g.fillStyle = '#069'; g.fillText('EMCON fingerprint', 4, 30); return c.toDataURL(); })()`;
-await test('canvas fingerprint is stable on one site but differs between sites', async () => {
-  const a = await browser.open(L + '/feed.html');
-  const b = await browser.open(IP + '/feed.html');
-  await ready(a); await ready(b);
-  const a1 = await a.eval(draw), a2 = await a.eval(draw), b1 = await b.eval(draw);
-  assert.equal(a1, a2, 'same site must read the same value twice');
-  assert.notEqual(a1, b1, 'two sites must see different fingerprints');
-  assert.equal(await a.eval('HTMLCanvasElement.prototype.toDataURL.toString()'), 'function toDataURL() { [native code] }');
+console.log('\nShield 1b · Anti-fingerprinting + Global Privacy Control');
+// A bare page whose first script reads the canvas while the HTML is still parsing, as real
+// fingerprinting scripts do (browserleaks.com, FingerprintJS). It also records its request headers.
+const DRAW = `function (d) { const c = d.createElement('canvas'); c.width = 220; c.height = 50; const g = c.getContext('2d');
+  g.font = '18px Arial'; g.fillStyle = '#f60'; g.fillRect(0, 0, 130, 40); g.fillStyle = '#069'; g.fillText('EMCON fingerprint', 4, 30); return c.toDataURL(); }`;
+let probeHeaders = {};
+const probe = http.createServer((req, res) => {
+  probeHeaders = req.headers;
+  res.setHeader('content-type', 'text/html');
+  res.end(`<!doctype html><title>probe</title><script>window.__early = (${DRAW})(document);</script><p>probe</p>`);
+});
+await new Promise((r) => probe.listen(0, '127.0.0.1', r));
+const PROBE = `http://127.0.0.1:${probe.address().port}/`;
+const early = async () => { const p = await browser.open(PROBE); return { p, v: await waitFor(() => p.eval('window.__early'), { what: 'probe page' }) }; };
+let first;
+await test('page scripts see a noised canvas from their very first line, and a fresh iframe is no way around it', async () => {
+  const { p, v } = await early();
+  first = v;
+  assert.equal(await p.eval(`(${DRAW})(document)`), v, 'reading twice on one page must match');
+  const inFrame = await p.eval(`(() => { const f = document.createElement('iframe'); document.body.append(f); return (${DRAW})(f.contentWindow.document); })()`);
+  await ext({ type: 'settings:set', patch: { farbleExceptions: ['127.0.0.1'] } });
+  const real = (await early()).v;
+  await ext({ type: 'settings:set', patch: { farbleExceptions: [] } });
+  assert.notEqual(v, real, 'the page must not see the real canvas');
+  assert.notEqual(inFrame, real, 'a fresh iframe must not expose the real canvas');
+});
+await test('every visit looks like a different device, and the wrappers look native', async () => {
+  const { p, v } = await early();
+  assert.notEqual(v, first, 'a new visit must get new noise');
+  assert.equal(await p.eval('HTMLCanvasElement.prototype.toDataURL.toString()'), 'function toDataURL() { [native code] }');
+  assert.equal(await p.eval('Function.prototype.toString.toString()'), 'function toString() { [native code] }');
+  assert.equal(await p.eval('"prototype" in HTMLCanvasElement.prototype.toDataURL'), false);
+});
+await test('Global Privacy Control reaches the site: Sec-GPC header and navigator.globalPrivacyControl', async () => {
+  const { p } = await early();
+  assert.equal(probeHeaders['sec-gpc'], '1');
+  assert.equal(await p.eval('navigator.globalPrivacyControl'), true);
 });
 
 console.log('\nShield 2 · Provenance badges');
@@ -258,6 +285,7 @@ await test('newspaper breaks its declared promise, before and after "Reject all"
   assert.match(by['Stops tracking after you say no'].evidence, /Reject all/);
   assert.ok(r.thirdParties.some((t) => t.host === 'collect.adnetwork-demo.example' && t.afterDenial >= 1), 'tracker contacted after denial');
   assert.ok(r.features.some((f) => f.f === 'canvas-readback' && f.afterDenial > 0), 'canvas fingerprinting after denial');
+  assert.equal(by['Honours your “do not sell or share” signal'].status, 'broken', 'trackers loaded despite GPC');
 });
 await test('a page that stops after you say no keeps the baseline promise', async () => {
   const p = await browser.open(L + '/vault.html');
@@ -268,6 +296,7 @@ await test('a page that stops after you say no keeps the baseline promise', asyn
   const r = (await ext({ type: 'privacy:tab', tabId })).result;
   assert.equal(r.promises.find((x) => x.text === 'Stops tracking after you say no').status, 'kept');
   assert.equal(r.trackerCount, 0);
+  assert.equal(r.promises.find((x) => x.text === 'Honours your “do not sell or share” signal').status, 'kept');
 });
 
 console.log('\nEvidence receipts');
@@ -286,6 +315,22 @@ await test('website receipt is signed, server-timestamped and verifiable by anyo
   const bad = structuredClone(vc);
   bad.credentialSubject.verdict.risk = 0;
   assert.equal((await verifyReceipt(bad, { timestampDid: tsDid })).signature, false);
+});
+await test('“Check a link”: a pasted SMS is followed through its redirects without opening it, and gets a receipt', async () => {
+  const sms = `Congratulations! You have won a QuickKart prize. Claim within 24 hours: ${L}/s/qk50`;
+  const r = await ext({ type: 'link:check', text: sms });
+  assert.ok(!r.error, r.error);
+  const v = r.result;
+  const by = Object.fromEntries(v.checks.map((c) => [c.id, c]));
+  console.log(`      ${v.level} · risk ${v.risk} · ${v.checks.filter((c) => c.status === 'found').map((c) => c.label).join(' · ')}`);
+  assert.equal(new URL(v.url).pathname, '/claim.html', 'judged by where the link lands');
+  assert.equal(by.message?.status, 'found', 'prize wording in the pasted message');
+  assert.ok(v.chain.length >= 3 && v.chain.filter((h) => /redirect/.test(h.via)).length >= 2, 'both redirects shown');
+  assert.notEqual(v.level, 'ok');
+  const rc = await ext({ type: 'receipt:create', checkId: v.checkId });
+  assert.ok(!rc.error, rc.error);
+  assert.equal(rc.result.credentialSubject.kind, 'link');
+  assert.equal((await verifyReceipt(rc.result, { timestampDid: tsDid })).signature, true);
 });
 await test('image receipt explains why a doctored photo is "altered"', async () => {
   const feed = await (await fetch(L + '/api/prov/feed')).json();
@@ -307,6 +352,7 @@ await test('receipt page renders the evidence inside the extension', async () =>
 
 await browser.close();
 server.close();
+probe.close();
 console.log(`\n${passed} passed, ${failed} failed\n`);
 fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 process.exit(failed ? 1 : 0);

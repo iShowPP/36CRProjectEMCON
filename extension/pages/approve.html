@@ -2,31 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>EMCON Ghost: sign-in request</title>
+  <title>EMCON Ghost Sign-in</title>
   <link rel="stylesheet" href="pages.css">
   <style>
-    body { padding: 20px; }
-    .site { font: 600 15px var(--mono); word-break: break-all; margin: 4px 0 12px; }
-    ul { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; } li { margin: 3px 0; }
-    h2 { font-size: 15px; margin-top: 4px; }
+    body { padding: 20px 20px 24px; }
+    .top { display: flex; align-items: center; gap: 10px; }
+    .top .gi { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--primary-tint); color: var(--primary); }
+    .site { display: flex; align-items: center; gap: 8px; margin: 14px 0 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--border); font: 600 15px var(--mono); overflow-wrap: anywhere; }
+    .cols { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    ul.yes, ul.no { list-style: none; margin: 6px 0 0; padding: 0; }
+    ul.yes li, ul.no li { position: relative; padding: 5px 0 5px 26px; font-size: 14px; }
+    ul.yes li::before, ul.no li::before { content: ""; position: absolute; left: 0; top: 7px; width: 18px; height: 18px; border-radius: 50%; }
+    ul.yes li::before { background: var(--safe-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23067647' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4L18 8'/%3E%3C/svg%3E") center / 12px no-repeat; }
+    ul.no li::before { background: var(--neutral-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E") center / 11px no-repeat; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
   </style>
 </head>
 <body>
-  <div class="kicker">EMCON Ghost · sign-in request</div>
-  <h1 style="font-size:22px;margin-top:4px">Approve this sign-in?</h1>
+  <div class="top"><span class="gi" data-icon="ghost" data-size="22"></span><div><div class="label">EMCON Ghost</div><h1 style="font-size:20px">Sign in to this site?</h1></div></div>
   <p class="site" id="origin"></p>
-  <div class="card">
-    <h2>This site will learn</h2>
-    <ul id="shares"></ul>
-    <h2>It will not learn</h2>
-    <ul class="muted"><li>Your name, email, phone or birthdate</li><li>Any ID that other sites also see</li><li>Who verified you, or when</li></ul>
+  <div class="cols">
+    <div class="card"><h3>This site will learn</h3><ul class="yes" id="shares"></ul></div>
+    <div class="card"><h3>It will never learn</h3><ul class="no"><li>Your name, email, phone or birthdate</li><li>Any ID that other sites also see</li><li>Who verified you, or when</li></ul></div>
   </div>
   <div id="pinBox" class="hidden"><label for="pin">Your Ghost PIN</label><input id="pin" type="password" inputmode="numeric" autofocus></div>
-  <div class="row" style="margin-top:12px">
-    <button id="ok" class="primary">Approve</button>
+  <div class="btns">
     <button id="no">Decline</button>
+    <button id="ok" class="primary">Approve</button>
   </div>
-  <div id="msg" class="small" style="margin-top:8px"></div>
+  <div id="msg" class="small bad" style="margin-top:8px"></div>
   <script type="module" src="approve.js"></script>
 </body>
 </html>

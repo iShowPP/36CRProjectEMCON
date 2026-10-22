@@ -8,15 +8,14 @@ import { dhash } from './lib/dhash.js';
 import { domTokens, simhash64 } from './lib/simhash.js';
 import { computeTrust, scoreDomain } from './lib/trustgraph.js';
 import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
-import { farble } from './lib/farble.js';
 import { normDomain, isIp, isLocal, registrable } from './lib/domains.js';
-import { lureFindings, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
+import { lureFindings, urlsIn, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
 import { receiptDigest } from './lib/receipt.js';
-import { initWatch, tabState, persist, recordPageFacts, chainReport, privacyReport, markConsent } from './watch.js';
+import { initWatch, tabState, persist, recordPageFacts, chainReport, linkChainReport, privacyReport, markConsent, setGpc, watchHooks } from './watch.js';
 import { DEFAULT_SERVER } from './config.js';
 
 const VERSION = chrome.runtime.getManifest().version;
-const DEFAULTS = { server: DEFAULT_SERVER, farble: true, farbleExceptions: [], provenance: true, provRecovery: true, wot: true, privacy: true };
+const DEFAULTS = { server: DEFAULT_SERVER, farble: true, farbleExceptions: [], provenance: true, provRecovery: true, wot: true, privacy: true, gpc: true };
 const local = {
   get: async (k) => (await chrome.storage.local.get(k))[k],
   set: (k, v) => chrome.storage.local.set({ [k]: v }),
@@ -31,6 +30,7 @@ async function api(path, { method = 'GET', body } = {}) {
   return j;
 }
 
+const caches = []; // everything fetched from the server; cleared when the user switches servers
 function cached(ttlMs, fn) {
   let at = 0, val;
   const get = async () => {
@@ -38,8 +38,27 @@ function cached(ttlMs, fn) {
     return val;
   };
   get.reset = () => { val = null; };
+  caches.push(get);
   return get;
 }
+
+// "This week" tally shown in the popup: what EMCON did for you. Counts only, no addresses.
+let statsQueue = Promise.resolve();
+function bumpStat(key, n = 1) {
+  statsQueue = statsQueue.then(async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const s = (await local.get('stats')) || {};
+    (s[day] ||= {})[key] = (s[day][key] || 0) + n;
+    for (const d of Object.keys(s).sort().slice(0, -7)) delete s[d];
+    await local.set('stats', s);
+  }).catch(() => {});
+}
+async function weekStats() {
+  const t = {};
+  for (const day of Object.values((await local.get('stats')) || {})) for (const [k, n] of Object.entries(day)) t[k] = (t[k] || 0) + n;
+  return t;
+}
+watchHooks({ onNewTracker: () => bumpStat('trackers') });
 
 // One random master secret; every other key is derived from it with a label.
 let masterP;
@@ -187,22 +206,39 @@ async function ghostResetSite({ origin }) {
 }
 
 // =====================================================================
-// Shield 1b + privacy monitor: injected before page scripts run
+// Shield 1b + privacy monitor + Global Privacy Control
 // =====================================================================
+// content/guard.js is registered as a MAIN-world document_start script, so Chrome runs it
+// before any page script (an injection from here, after the navigation commits, loses
+// that race on real sites). Its flags are the content/cfg/*.js files listed before it.
 initWatch();
-const topOrigins = new Map();
-chrome.webNavigation.onCommitted.addListener(async (d) => {
-  if (!/^https?:/.test(d.url)) return;
-  const origin = new URL(d.url).origin;
-  if (d.frameId === 0) topOrigins.set(d.tabId, origin);
+const GPC_RULE = {
+  id: 1, priority: 1,
+  action: { type: 'modifyHeaders', requestHeaders: [{ header: 'Sec-GPC', operation: 'set', value: '1' }] },
+  condition: { resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'media', 'websocket', 'other'] },
+};
+const scriptSig = (list) => JSON.stringify(list.map(({ id, js, matches, excludeMatches }) => [id, js, matches, excludeMatches?.length ? excludeMatches : []]).sort());
+async function applyGuard() {
   const st = await settings();
-  const top = d.frameId === 0 ? origin : topOrigins.get(d.tabId) || origin;
-  // seed differs per (top site, frame origin): a tracker iframe gets a different device on every site
-  const seed = st.farble && !st.farbleExceptions.includes(new URL(top).hostname) ? toHex(await derive(`emcon/farble|${top}|${origin}`)).slice(0, 16) : null;
-  if (!seed && !st.privacy) return;
-  chrome.scripting.executeScript({ target: { tabId: d.tabId, frameIds: [d.frameId] }, world: 'MAIN', injectImmediately: true, func: farble, args: [seed, !!st.privacy] }).catch(() => {});
-});
-chrome.tabs.onRemoved.addListener((tabId) => { topOrigins.delete(tabId); lastFacts.delete(tabId); });
+  setGpc(st.gpc);
+  const flags = [st.privacy && 'content/cfg/watch.js', st.gpc && 'content/cfg/gpc.js'].filter(Boolean);
+  const off = st.farbleExceptions.map((h) => `*://${h}/*`);
+  const base = { matches: ['http://*/*', 'https://*/*'], runAt: 'document_start', allFrames: true, matchOriginAsFallback: true, world: 'MAIN' };
+  const want = [];
+  if (st.farble) want.push({ ...base, id: 'emcon-guard', excludeMatches: off, js: [...flags, 'content/cfg/noise.js', 'content/guard.js'] });
+  // sites where the user turned fingerprint protection off still get the monitor and GPC
+  if (flags.length && (!st.farble || off.length)) want.push({ ...base, id: 'emcon-guard-lite', matches: st.farble ? off : base.matches, js: [...flags, 'content/guard.js'] });
+  const have = await chrome.scripting.getRegisteredContentScripts();
+  if (scriptSig(have) !== scriptSig(want)) {
+    if (have.length) await chrome.scripting.unregisterContentScripts();
+    if (want.length) await chrome.scripting.registerContentScripts(want);
+  }
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [GPC_RULE.id], addRules: st.gpc ? [GPC_RULE] : [] });
+}
+let guardQueue = Promise.resolve();
+const syncGuard = () => (guardQueue = guardQueue.then(applyGuard).catch((e) => console.warn('EMCON guard:', e)));
+syncGuard();
+chrome.tabs.onRemoved.addListener((tabId) => { lastFacts.delete(tabId); tabImages.delete(tabId); });
 
 // =====================================================================
 // Shield 2: media provenance
@@ -210,6 +246,8 @@ chrome.tabs.onRemoved.addListener((tabId) => { topOrigins.delete(tabId); lastFac
 const trustList = cached(10 * 60e3, () => api('/api/prov/trust-list'));
 const registry = cached(10 * 60e3, () => api('/api/prov/registry'));
 const provCache = new Map();
+const tabImages = new Map(); // tabId -> { url, counts: { verified: 2, … } } for the popup
+const LABELLED = new Set(['verified', 'recovered', 'untrusted', 'altered', 'forged', 'c2pa']);
 
 function provCheck(url) {
   if (provCache.has(url)) return provCache.get(url);
@@ -260,6 +298,11 @@ function imageChecks(r) {
     row('Signer on your trust list', r.trustListLoaded === false ? 'unknown' : trusted ? 'good' : 'found', r.trustListLoaded === false ? 'Trust list could not be loaded' : trusted ? `Yes: ${r.issuerName}` : 'No: the signer is self-declared');
   } else {
     row('Signed provenance label in the file', r.status === 'c2pa' ? 'note' : 'clear', r.status === 'c2pa' ? 'No EMCON label, but a C2PA (Content Credentials) manifest is present' : 'No label in this file (common: most images are unsigned)');
+    if (r.status === 'c2pa') {
+      const c = r.c2pa || {};
+      row('C2PA signer (read, not validated)', 'note', [c.signer && `signed by ${c.signer}`, c.issuer && `certificate issued by ${c.issuer}`, c.generator && `made with ${c.generator}`, c.timestampAuthority && `timestamped by ${c.timestampAuthority}`].filter(Boolean).join('; ') || 'No readable signer details');
+      return rows;
+    }
     if (r.status === 'recovered') row('Visual match with a signed original', 'good', `Matches “${r.match.title}” by ${r.match.issuerName} (${64 - r.distance}/64 fingerprint bits): ${r.match.url}`);
     else row('Visual match with a signed original', r.registryChecked === false ? 'unknown' : 'clear', r.registryChecked === false ? 'The registry could not be checked' : 'No signed original looks like this image');
   }
@@ -382,6 +425,7 @@ const list = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', 
 const ago = (days) => (days >= 730 ? `${Math.floor(days / 365)} years` : `${days} days`);
 
 const lastFacts = new Map(); // tabId -> {page, sender}: lets a pasted message re-run the analysis
+const countedPages = new Set(); // tab|url already counted in the weekly tally
 
 /**
  * Every check becomes an evidence row: found (warning evidence), good (positive evidence),
@@ -469,11 +513,12 @@ async function wotAnalyze(page, sender) {
         hit = true;
       }
     }
-    if (!hit) check('brand', 'Brand impersonation', 'clear', `Doesn't copy or imitate any of the ${brands.length} protected brands`);
+    if (!hit) check('brand', 'Brand impersonation', 'clear', sender.linkCheck ? `The address doesn't imitate any of the ${brands.length} protected brands (page layout not checked without opening it)` : `Doesn't copy or imitate any of the ${brands.length} protected brands`);
   }
 
   // 4. What the page asks for, and where it would send it
-  if (fields.length) check('data', 'Details this page asks for', 'note', `Asks for: ${list(fields)}`);
+  if (sender.linkCheck) check('data', 'Details this page asks for', 'unknown', 'Not checked: EMCON followed the link without opening the page in your browser');
+  else if (fields.length) check('data', 'Details this page asks for', 'note', `Asks for: ${list(fields)}`);
   else check('data', 'Details this page asks for', 'clear', 'No password, payment or ID fields on this page');
   if (page.hasPassword) {
     let issue = false;
@@ -494,6 +539,9 @@ async function wotAnalyze(page, sender) {
     if (page.privacyPromise && st.privacy) st.privacy.promise = { tokens: page.privacyPromise, source: 'declared by the site' };
     persist(tabId);
     ch = chainReport(st, sender.url, pageLure);
+  } else if (sender.linkCheck) {
+    ch = linkChainReport(sender.linkCheck);
+    if (!sender.linkCheck.complete) check('path', 'How the link redirects', 'unknown', sender.linkCheck.error || 'EMCON could not follow the link to its end (the site did not answer)');
   }
   const lure = ch ? ch.lure : pageLure.map((l) => ({ ...l, where: 'this page' }));
   if (ch && ch.hops.length > 1) {
@@ -502,19 +550,24 @@ async function wotAnalyze(page, sender) {
     if (ch.redirects) bits.push(`${ch.redirects} automatic redirect(s)`);
     if (ch.shorteners.length) bits.push(`link shortener ${list(ch.shorteners)}`);
     bits.push(`${ch.sites.length} site(s)`);
-    check('path', 'How you got here', pts ? 'found' : 'clear', `${bits.join(', ')}: ${ch.hops.map((h) => h.label).join(' → ')}`, pts);
-  } else check('path', 'How you got here', 'clear', 'You opened this page directly');
+    // redirects alone are routine (sign-in flows, brand short links): a note; a shortener hiding the address is a finding
+    check('path', 'How you got here', pts >= 10 ? 'found' : pts ? 'note' : 'clear', `${bits.join(', ')}: ${ch.hops.map((h) => h.label).join(' → ')}`, pts);
+  } else if (sender.linkCheck) check('path', 'How you got here', 'clear', `The link goes straight to ${ch.hops[0]?.label}, with no redirects`);
+  else check('path', 'How you got here', 'clear', 'You opened this page directly');
   if (ch?.message) {
     check('message', 'The message you pasted', ch.message.lure ? 'found' : 'clear', `${ch.message.lure ? `${ch.message.lure} scam-style phrase(s)` : 'No scam-style wording'}${ch.message.urls.length ? `; its link ${ch.message.linked ? 'leads into this chain' : 'does not appear in this chain'}` : '; it contains no link'}`);
   }
   const strongLure = lure.filter(STRONG_LURE);
   if (lure.length) check('lure', 'Scam-style wording along the way', 'found', lure.slice(0, 4).map((l) => `“${l.phrase}” (${l.where})`).join(', '), strongLure.length ? 10 : 5);
   else check('lure', 'Scam-style wording along the way', 'clear', 'No prize, threat, fee or urgency wording found');
-  if (strongLure.length && sensitive.length && strong.length) {
+  if (strongLure.length && strong.length && (sensitive.length || sender.linkCheck)) {
     const stages = [`${strongLure[0].kind} wording (“${strongLure[0].phrase}”)`];
     if (ch?.redirects) stages.push(`${ch.redirects} redirect(s)`);
-    stages.push(strong[0], `asks for ${list(sensitive)}`);
-    check('chain', 'Scam chain', 'found', `Every stage of a classic scam is present: ${stages.join(' → ')}`, 30);
+    stages.push(strong[0]);
+    if (sensitive.length) stages.push(`asks for ${list(sensitive)}`);
+    check('chain', 'Scam chain', 'found', sensitive.length ? `Every stage of a classic scam is present: ${stages.join(' → ')}` : `The message's scam wording leads to a suspicious site: ${stages.join(' → ')}`, sensitive.length ? 30 : 20);
+    // inside a scam chain, the redirects are part of the evidence, not a side note
+    for (const c of checks) if (c.id === 'path' && c.status === 'note') c.status = 'found';
   }
 
   // A good reputation never cancels scam evidence on the page itself: reputable sites get
@@ -531,9 +584,17 @@ async function wotAnalyze(page, sender) {
   risk = Math.max(0, Math.min(100, risk));
   const level = risk >= 60 ? 'danger' : risk >= 30 ? 'caution' : (s?.pos || 0) >= 0.5 && !pageEvidence ? 'trusted' : 'unknown';
   const verdict = { url: sender.url, domain, risk, level, checks, chain: ch?.hops.length > 1 ? ch.hops : [], at: Date.now() };
+  const seenKey = `${tabId ?? 'link'}|${sender.url}`;
+  if (!countedPages.has(seenKey)) {
+    countedPages.add(seenKey);
+    if (countedPages.size > 500) countedPages.delete(countedPages.values().next().value);
+    bumpStat(sender.linkCheck ? 'links' : 'pages');
+    if (level === 'danger') bumpStat('blocked');
+    else if (level === 'caution') bumpStat('warned');
+  }
   if (tabId != null) {
     await chrome.storage.session.set({ ['verdict_' + tabId]: verdict });
-    const [text, color] = { danger: ['!', '#b42318'], caution: ['?', '#946200'], trusted: ['✓', '#1f6f43'], unknown: ['', '#6b6b6b'] }[level];
+    const [text, color] = { danger: ['!', '#B42318'], caution: ['?', '#B54708'], trusted: ['✓', '#067647'], unknown: ['', '#475467'] }[level];
     chrome.action.setBadgeText({ tabId, text });
     chrome.action.setBadgeBackgroundColor({ tabId, color });
   }
@@ -549,6 +610,28 @@ async function chainMessage({ tabId, text }) {
   const v = await wotAnalyze(f.page, f.sender);
   chrome.tabs.sendMessage(tabId, { type: 'emcon:verdict', verdict: v }).catch(() => {});
   return v;
+}
+
+// "Check a link or message": judge where a link really lands without opening it.
+const linkChecks = new Map(); // id -> verdict, for receipts
+async function linkCheck({ text }) {
+  const raw = String(text || '').trim().slice(0, 2000);
+  const start = urlsIn(raw)[0];
+  if (!start) throw new Error('No link found. Paste a link, or a whole message that contains one.');
+  let exp;
+  try { exp = await api('/api/link/expand?url=' + encodeURIComponent(start)); } catch (e) { exp = { hops: [{ url: start }], final: start, complete: false, error: e.message }; }
+  // hop i was reached the way hop i-1 left
+  const hops = exp.hops.map((h, i) => ({ url: h.url, via: i === 0 ? 'link' : exp.hops[i - 1].leaves || 'redirect' }));
+  if (hops[hops.length - 1]?.url !== exp.final) hops.push({ url: exp.final, via: exp.hops[exp.hops.length - 1]?.leaves || 'redirect' });
+  const message = /\s/.test(raw) ? raw : ''; // a bare link has no spaces; anything more is a message
+  const v = await wotAnalyze(
+    { title: '', text: '', html: '', hasPassword: false, formHosts: [], fields: [] },
+    { url: exp.final, linkCheck: { hops, message, complete: exp.complete, error: exp.error } },
+  );
+  const checkId = toHex(randomBytes(6));
+  linkChecks.set(checkId, { ...v, checkedLink: start });
+  if (linkChecks.size > 50) linkChecks.delete(linkChecks.keys().next().value);
+  return { ...v, checkId, checkedLink: start };
 }
 
 async function wotAttest({ domain, verdict, transacted, note }) {
@@ -626,11 +709,20 @@ async function privacyConsent({ tabId, state, how }, sender) {
 // =====================================================================
 // Evidence receipts
 // =====================================================================
-async function receiptCreate({ tabId, image }) {
+async function receiptCreate({ tabId, image, checkId }) {
   const { did, privateKey } = await wotIdentity();
   const { server } = await settings();
   let subject;
-  if (image) {
+  if (checkId) {
+    const v = linkChecks.get(checkId);
+    if (!v) throw new Error('That link check has expired. Check the link again.');
+    subject = {
+      id: v.checkedLink, kind: 'link', lands: v.url, domain: v.domain, checkedAt: new Date(v.at).toISOString(),
+      verdict: { level: v.level, risk: v.risk },
+      checks: v.checks.map(({ label, status, detail, pts }) => ({ label, status, detail, points: pts })),
+      path: v.chain.map(({ label, via }) => ({ host: label, via })),
+    };
+  } else if (image) {
     const r = await provCheck(image);
     subject = { id: image, kind: 'image', checkedAt: new Date(r.checkedAt || Date.now()).toISOString(), verdict: { status: r.status, summary: IMAGE_VERDICT[r.status] || r.status }, checks: imageChecks(r) };
   } else {
@@ -664,7 +756,17 @@ async function receiptCreate({ tabId, image }) {
 const HANDLERS = {
   // callable from web pages' content scripts
   'ghost:request': ghostRequest,
-  'prov:check': async (m) => ((await settings()).provenance ? Promise.all((m.urls || []).slice(0, 40).map(provCheck)) : []),
+  'prov:check': async (m, sender) => {
+    if (!(await settings()).provenance) return [];
+    const results = await Promise.all((m.urls || []).slice(0, 40).map(provCheck));
+    const tabId = sender.tab?.id;
+    if (tabId != null) {
+      const t = (tabImages.get(tabId)?.url === sender.tab.url && tabImages.get(tabId)) || { url: sender.tab.url, counts: {} };
+      for (const r of results) if (LABELLED.has(r?.status)) { t.counts[r.status] = (t.counts[r.status] || 0) + 1; bumpStat('photos'); }
+      tabImages.set(tabId, t);
+    }
+    return results;
+  },
   'wot:analyze': (m, sender) => wotAnalyze(m.page, sender),
   'privacy:features': privacyFeatures,
   'privacy:consent': (m, sender) => privacyConsent({ state: m.state, how: m.how }, sender),
@@ -677,16 +779,26 @@ const HANDLERS = {
   'ghost:approval-info': ({ id }) => { const a = approvals.get(id); if (!a) throw new Error('request expired'); const { resolve, ...info } = a; return info; },
   'ghost:approve': ghostApprove,
   'wot:tab': async ({ tabId }) => (await chrome.storage.session.get('verdict_' + tabId))['verdict_' + tabId] || null,
+  'prov:tab': async ({ tabId }) => { const tab = await chrome.tabs.get(tabId).catch(() => null); const t = tabImages.get(tabId); return t && tab?.url === t.url ? t.counts : {}; },
+  'stats:week': weekStats,
   'wot:me': async () => ({ did: (await wotIdentity()).did, roots: (await wotState()).roots }),
   'wot:attest': wotAttest,
   'wot:trust': wotTrust,
   'wot:untrust': wotUntrust,
   'chain:message': chainMessage,
+  'link:check': linkCheck,
   'privacy:tab': async ({ tabId }) => privacyReport(await tabState(tabId)),
   'privacy:mark': (m, sender) => privacyConsent({ tabId: m.tabId, state: m.state || 'denied', how: 'marked “I said no” in EMCON' }, sender),
   'receipt:create': receiptCreate,
   'settings:get': settings,
-  'settings:set': async ({ patch }) => { const s = { ...(await settings()), ...patch }; await local.set('settings', s); return s; },
+  'settings:set': async ({ patch }) => {
+    const before = await settings();
+    const s = { ...before, ...patch };
+    await local.set('settings', s);
+    if (s.server !== before.server) for (const c of caches) c.reset();
+    await syncGuard();
+    return s;
+  },
 };
 const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze', 'privacy:features', 'privacy:consent', 'receipt:open']);
 

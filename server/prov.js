@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { db, save, HttpError, MEDIA_DIR } from './store.js';
+import { db, save, HttpError, MEDIA_DIR, ROOT } from './store.js';
 import { ed25519Jwk } from './keys.js';
 import { contentHash, detectFormat, embedManifest, signManifest } from '../extension/lib/provenance.js';
 import { fromB64, fromB64u, toHex, sha256, ed25519FromSeed, hamming } from '../extension/lib/util.js';
@@ -28,6 +28,16 @@ export default async function prov(route) {
     const jwk = db.prov.signers[id];
     const { privateKey, pub } = await ed25519FromSeed(fromB64u(jwk.d));
     keys[id] = { ...meta, id, privateKey, pub: jwk.x, keyId: toHex(await sha256(pub)).slice(0, 16) };
+  }
+
+  // Signed photos published on other hosts (docs/media on GitHub): their fingerprints are
+  // seeded on every start, so a host that wipes its disk still recognises stripped copies.
+  const seedFile = path.join(ROOT, 'server', 'seed', 'registry.json');
+  if (fs.existsSync(seedFile)) {
+    for (const s of JSON.parse(fs.readFileSync(seedFile, 'utf8'))) {
+      if (!db.prov.registry.some((r) => r.dhash === s.dhash && r.url === s.url)) db.prov.registry.push(s);
+    }
+    save();
   }
 
   // In production this list is itself signed and distributed like a CA bundle.

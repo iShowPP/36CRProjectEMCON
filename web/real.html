@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMCON on Real Websites</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .intro { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: center; margin-bottom: 18px; }
+    .demo { display: grid; grid-template-columns: 240px 1fr; gap: 28px; padding: 26px 24px; margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+    .demo .num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+    .demo h2 { margin-top: 2px; font-size: 20px; }
+    .demo .why { font-size: 14px; color: var(--text-2); margin: 8px 0 0; }
+    .demo ol { margin: 0; padding-left: 22px; } .demo ol li { margin: 6px 0; }
+    .demo ol li::marker { font-weight: 700; color: var(--primary); }
+    .expect { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--primary-tint); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); font-size: 15px; }
+    .expect b:first-child { font-size: 13px; font-weight: 700; color: var(--primary); display: block; margin-bottom: 2px; }
+    .sites { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+    .sites a { font-size: 14px; font-weight: 500; padding: 6px 12px; border: 1px solid var(--border-2); border-radius: 999px; text-decoration: none; color: var(--text); background: var(--surface); }
+    .sites a:hover { border-color: var(--primary); color: var(--primary); }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 12px; }
+    .gallery figure { margin: 0; }
+    .gallery img { width: 100%; height: 130px; object-fit: cover; display: block; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+    .gallery figcaption { font-size: 13.5px; margin-top: 8px; color: var(--text-2); }
+    .gallery figcaption b { color: var(--text); display: block; font-size: 14px; }
+    #sms { min-height: 96px; font: 14px/1.55 var(--font); border-radius: 14px; background: var(--surface-2); }
+    .bad-note { font-size: 14px; color: var(--bad); margin: 8px 0 0; }
+    @media (max-width: 760px) { .intro, .demo { grid-template-columns: 1fr; gap: 10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="intro">
+      <div>
+        <div class="kicker">EMCON · live on the real internet</div>
+        <h1>Every shield, on websites we don't control.</h1>
+        <p class="lead" style="margin:0">Real phishing sites from a live feed, real short links, real C2PA files, real news sites full of trackers and a real fingerprinting test. Each demo says where to go, what to do and what EMCON shows.</p>
+      </div>
+      <div class="card">
+        <div class="kicker">Before you start</div>
+        <ol class="small" style="margin:6px 0 0;padding-left:18px">
+          <li>Install the extension and set its server to <code id="here"></code>.</li>
+          <li>Use <b>Chrome</b> or <b>Edge</b> for the fingerprinting demo: Brave already randomises canvas on its own.</li>
+          <li>Ghost sign-in needs a partner website that accepts it, so it stays on <a href="/rp.html">our demo shop</a>.</li>
+        </ol>
+        <div id="ext" class="small" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <section class="demo">
+      <div><div class="num">01</div><h2>Check a link from a scam SMS</h2><p class="why">The link is followed on the EMCON server, so your browser never opens the scam page.</p></div>
+      <div>
+        <ol>
+          <li>Make a test message. It uses an address that is in the live OpenPhish phishing feed right now (<b id="feedCount">…</b> sites, updated <span id="feedWhen">…</span>).</li>
+        </ol>
+        <textarea id="sms" readonly aria-label="Test scam message"></textarea>
+        <div class="row" style="margin-top:8px"><button id="copySms" class="primary">Copy test message</button><button id="newSms">Use another live site</button><span id="copied" class="small muted"></span></div>
+        <ol start="2" style="margin-top:12px">
+          <li>Click the EMCON icon → <b>Check message</b> (bottom bar) → paste → <b>Check safely</b>.</li>
+          <li>For comparison, check these real short links: <code>youtu.be/jNQXAC9IVRw</code> (YouTube's own shortener) and <code>aka.ms/terminal</code> (Microsoft's).</li>
+        </ol>
+        <div class="expect"><b>You should see</b>The scam message: <i>Very likely a scam</i>, with rows for the OpenPhish report, the "account will be blocked" wording and where the link really goes. The real short links: each redirect listed and no warning. The scam phrases are highlighted in your message, and <i>Save signed proof</i> keeps the result as evidence.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">02</div><h2>Phishing sites and real logins</h2><p class="why">The same checks run on every page you visit, using public registries and the live feed.</p></div>
+      <div>
+        <ol>
+          <li>Open real login pages. EMCON stays quiet because these are the brands' official domains:</li>
+        </ol>
+        <div class="sites">
+          <a href="https://www.paypal.com/signin" target="_blank" rel="noopener">paypal.com/signin</a>
+          <a href="https://www.onlinesbi.sbi.bank.in/" target="_blank" rel="noopener">onlinesbi.sbi.bank.in</a>
+          <a href="https://netbanking.hdfcbank.com/netbanking/" target="_blank" rel="noopener">HDFC NetBanking</a>
+          <a href="https://www.instagram.com/accounts/login/" target="_blank" rel="noopener">instagram.com login</a>
+          <a href="https://accounts.google.com/" target="_blank" rel="noopener">accounts.google.com</a>
+        </div>
+        <ol start="2" style="margin-top:12px">
+          <li>Optional, and your decision: open one live feed address below in a <b>separate browser profile</b> that has EMCON installed. Never type anything into it.</li>
+        </ol>
+        <div id="feedSample" class="mono" style="margin-top:6px"></div>
+        <p class="bad-note">These are working scam sites. Written with [.] so they can't be clicked by accident.</p>
+        <div class="expect"><b>You should see</b>Official logins: no warning, and <i>This site</i> in the popup says <i>No warning signs found</i>. A live phishing site: a full-page block before you can type, citing the OpenPhish report, the domain's age from the public registry and any look-alike spelling.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">03</div><h2>Scam chain detector</h2><p class="why">Builds the path that led to a page from link clicks, redirects and tabs opened by other tabs.</p></div>
+      <div>
+        <ol>
+          <li>Click a real short link: <a href="https://youtu.be/jNQXAC9IVRw" target="_blank" rel="noopener">youtu.be/jNQXAC9IVRw</a> or <a href="https://aka.ms/terminal" target="_blank" rel="noopener">aka.ms/terminal</a>.</li>
+          <li>On the page it lands on, open EMCON → <b>This site</b>.</li>
+        </ol>
+        <div class="expect"><b>You should see</b><i>How you got here</i>: this page → the short link → the HTTP redirect → the landing page. With no scam wording and no request for card details, it stays a note, not a warning. On a live phishing site (demo 02) the same row joins the block evidence. The full prize-SMS chain runs on <a href="/sms.html">our demo pages</a>, because we won't make a short link to a real scam site.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">04</div><h2>Real and edited photos</h2><p class="why">These images are hosted on GitHub and on a public image CDN, not on this server. EMCON downloads and checks each one.</p></div>
+      <div>
+        <div class="gallery">
+          <figure><img src="https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/CA.jpg" alt="C2PA sample image from the c2pa-rs project"><figcaption><b>Content Credentials · C2PA Signer</b>A real C2PA file from the Content Authenticity Initiative's own repository. EMCON reads the signer, issuer and timestamp authority.</figcaption></figure>
+          <figure><img src="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png" alt="Signed demo photo"><figcaption><b>Verified · Kestrel Daily News</b>Signed by our demo newsroom's key, hosted on GitHub.</figcaption></figure>
+          <figure><img src="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/doctored-photo.png" alt="Edited copy of the signed photo"><figcaption><b>Altered after signing</b>Same photo with pixels changed, still carrying the original signature.</figcaption></figure>
+          <figure><img src="https://images.weserv.nl/?url=raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png&output=jpg&q=80" alt="Re-encoded copy with the signature stripped"><figcaption><b>Recovered · Kestrel Daily News</b>Re-encoded to JPEG by the images.weserv.nl CDN, which strips the signature. EMCON matches its visual fingerprint locally.</figcaption></figure>
+        </div>
+        <ol style="margin-top:14px">
+          <li>Hover a label and click it for the evidence. Each image also opens on its own host, with the same result.</li>
+          <li>Try it yourself: download the <a href="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png" target="_blank" rel="noopener">signed photo</a>, post it anywhere that recompresses images, and view the posted copy.</li>
+          <li>Cross-check the C2PA file with the official <a href="https://contentcredentials.org/verify" target="_blank" rel="noopener">contentcredentials.org/verify</a>.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>The four labels above, matching the captions. Images with no signature get no label at all: missing provenance proves nothing. EMCON reads C2PA details but doesn't validate the certificate chain; the official verifier does.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">05</div><h2>Privacy promise monitor</h2><p class="why">EMCON sends Global Privacy Control, a "do not sell or share my data" signal the site actually receives, then watches what the page does.</p></div>
+      <div>
+        <ol>
+          <li>Open a big news site and scroll a little:</li>
+        </ol>
+        <div class="sites">
+          <a href="https://timesofindia.indiatimes.com/" target="_blank" rel="noopener">timesofindia.indiatimes.com</a>
+          <a href="https://edition.cnn.com/" target="_blank" rel="noopener">edition.cnn.com</a>
+          <a href="https://www.forbes.com/" target="_blank" rel="noopener">forbes.com</a>
+          <a href="https://www.wired.com/" target="_blank" rel="noopener">wired.com</a>
+          <a href="https://www.theguardian.com/international" target="_blank" rel="noopener">theguardian.com</a>
+        </div>
+        <ol start="2" style="margin-top:12px">
+          <li>Open EMCON → <b>Privacy</b>.</li>
+          <li>Check the signal is really sent: <a href="https://globalprivacycontrol.org/" target="_blank" rel="noopener">globalprivacycontrol.org</a> says "GPC signal detected", and <a href="https://httpbin.org/headers" target="_blank" rel="noopener">httpbin.org/headers</a> shows <code>Sec-Gpc: 1</code>.</li>
+          <li>If a site shows you a cookie banner, click its <b>Reject all</b>. EMCON notices and tests "stops tracking after you say no" as well. Most sites only show the banner to visitors from Europe.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>In our tests from India: Times of India, CNN, Forbes and Wired loaded 43 to 48 known tracking domains each despite the signal, so <i>Honours your "do not sell or share" signal</i> is <i>Broken</i>, with every domain named. The Guardian loaded none, so <i>Kept</i>. GPC is a legal opt-out in California, Colorado and several other US states; elsewhere it is a request, and the row says so.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">06</div><h2>Anti-fingerprinting</h2><p class="why">Runs before the page's first script, so even fingerprinting code at the very top of a page sees the noise.</p></div>
+      <div>
+        <ol>
+          <li>Open <a href="https://browserleaks.com/canvas" target="_blank" rel="noopener">browserleaks.com/canvas</a> and note the <b>Signature</b>. Reload: it changes, so visits can't be linked.</li>
+          <li>EMCON → <b>More</b> → <b>Settings</b> → <i>Pause fingerprint protection here</i>, reload: you see your real signature, the same on every reload.</li>
+          <li>Open <a href="https://browserleaks.com/webgl" target="_blank" rel="noopener">browserleaks.com/webgl</a>: <i>Unmasked Renderer</i> shows a common graphics card instead of yours.</li>
+          <li>See who fingerprints you: on <a href="https://stackoverflow.com/questions" target="_blank" rel="noopener">stackoverflow.com</a> or <a href="https://www.economist.com/" target="_blank" rel="noopener">economist.com</a>, EMCON → <b>Privacy</b> lists the canvas, audio and font probing.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>A new signature on every visit with EMCON on, and the real, stable one with it off for that site. Pages keep working: screen size, language and time zone are never faked.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">07</div><h2>Honey-Vault, with live scam data</h2><p class="why">Like Ghost sign-in, the vault lives inside a bank, so it runs on our demo bank. The scam data it checks payees against is live.</p></div>
+      <div>
+        <ol>
+          <li>Open <a href="/vault.html">Kestrel Bank</a> and add a payee whose website is one of the live feed addresses from demo 02 (copy it from the list and replace [.] with a dot).</li>
+          <li>Send that payee a payment, for example $600.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>The payment is held for your guardians, with the reason "flagged by OpenPhish live feed".</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">08</div><h2>Evidence receipts</h2><p class="why">Proof of what EMCON observed and when, which anyone can check without trusting us.</p></div>
+      <div>
+        <ol>
+          <li>After any demo above, save a receipt: EMCON → <b>This site</b> → <i>Save signed proof of this check</i> (it includes the privacy report), the same button under a message check, or click a photo's label → <i>Save signed proof</i>.</li>
+          <li>Open <a href="/verify.html">Verify a receipt</a> and drop the file in. Then change one character in the file and drop it in again.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>"Signature valid" and "countersigned by the EMCON server" with the time. The edited copy fails. The server only ever saw a hash of the receipt.</div>
+      </div>
+    </section>
+  </main>
+  <script type="module">
+    import { $, esc, api, ago, hubNav, hasExtension } from '/common.js';
+    hubNav('/real.html');
+    setTimeout(() => {
+      $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">EMCON is running on this page</span>' : '<span class="chip warn">Extension not detected on this page yet</span>';
+    }, 700);
+    api('/api/config').then((cfg) => { $('#here').textContent = cfg.official; }).catch(() => {});
+
+    let hosts = [], pick = 0;
+    const template = (host) => `SBI: Dear customer, your YONO account will be blocked today. Complete your KYC update immediately: https://${host}/`;
+    const showSms = () => {
+      $('#sms').value = hosts.length ? template(hosts[pick % hosts.length]) : 'The live phishing feed is not loaded on this server yet. Try again in a minute.';
+      $('#copySms').disabled = $('#newSms').disabled = !hosts.length;
+    };
+    $('#newSms').onclick = () => { pick++; showSms(); $('#copied').textContent = ''; };
+    $('#copySms').onclick = async () => {
+      try { await navigator.clipboard.writeText($('#sms').value); $('#copied').textContent = 'Copied. Now paste it into EMCON → Check message.'; }
+      catch { $('#sms').select(); $('#copied').textContent = 'Press Ctrl+C to copy.'; }
+    };
+
+    const feed = await api('/api/wot/feed?limit=12').catch(() => null);
+    if (feed?.count) {
+      hosts = feed.sample;
+      $('#feedCount').textContent = feed.count;
+      $('#feedWhen').textContent = feed.updated ? ago(Date.parse(feed.updated)) : 'recently';
+      $('#feedSample').innerHTML = feed.sample.slice(0, 5).map((h) => `<div>${esc(h.replace(/\./g, '[.]'))}</div>`).join('');
+    } else {
+      $('#feedCount').textContent = '0';
+      $('#feedWhen').textContent = 'n/a';
+      $('#feedSample').textContent = 'The live feed is not loaded on this server yet.';
+    }
+    showSms();
+  </script>
+</body>
+</html>

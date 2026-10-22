@@ -3,26 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EMCON evidence receipt</title>
+  <title>EMCON Evidence Receipt</title>
   <link rel="stylesheet" href="pages.css">
   <style>
-    body { padding: 32px 16px 56px; }
-    .doc { max-width: 760px; margin: 0 auto; background: var(--sheet); border: 1px solid var(--rule); border-top: 6px solid var(--ink); padding: 28px 32px; }
-    .doc.danger { border-top-color: var(--bad); } .doc.caution { border-top-color: var(--warn); }
-    dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; margin: 14px 0 18px; font-size: 13px; }
-    dt { font: 600 10.5px/1.9 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-    dd { margin: 0; overflow-wrap: anywhere; }
-    h2 { margin-top: 20px; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
-    @media (max-width: 560px) { .doc { padding: 20px 18px; } dl { grid-template-columns: 1fr; } }
+    body { padding: 28px 16px 64px; font-size: 15px; }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .brand img { width: 28px; height: 28px; } .brand b { font-size: 17px; letter-spacing: .02em; } .brand span { color: var(--text-2); }
+    .panel .hero h1 { font-size: 28px; }
+    .proof { margin-top: 14px; }
+    .proof .line { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .proof .line:last-child { border-bottom: 0; }
+    .proof .line .ic { margin-top: 2px; }
+    .proof .line b { display: block; }
+    .proof .line span { color: var(--text-2); font-size: 14px; overflow-wrap: anywhere; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .note { margin-top: 16px; }
   </style>
 </head>
 <body>
-  <article class="doc" id="doc">
-    <div class="kicker">EMCON · evidence receipt</div>
-    <h1 id="title">Building receipt…</h1>
-    <div id="body"><p class="muted">Signing with your EMCON key and requesting an independent timestamp.</p></div>
-  </article>
+  <div class="wrap">
+    <div class="brand"><img src="../icons/icon48.png" alt=""><b>EMCON</b><span>· Signed evidence receipt</span></div>
+    <article id="doc">
+      <h1 id="title" style="font-size:24px">Building your receipt…</h1>
+      <div id="body"><p class="muted" style="margin-top:6px">Signing with your EMCON key and asking the server for an independent timestamp.</p></div>
+    </article>
+  </div>
   <script type="module" src="receipt.js"></script>
 </body>
 </html>

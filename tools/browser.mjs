@@ -52,6 +52,7 @@ export async function launchBrowser({ profile, headless = false, exe = findBrows
   const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
   const toBrowser = proc.stdio[3], fromBrowser = proc.stdio[4];
   const pending = new Map();
+  const listeners = new Set(); // CDP events (method + params + sessionId), for debugging scripts
   let id = 0, buf = '';
   fromBrowser.on('data', (chunk) => {
     buf += chunk.toString('utf8');
@@ -61,6 +62,7 @@ export async function launchBrowser({ profile, headless = false, exe = findBrows
       buf = buf.slice(i + 1);
       const p = msg.id && pending.get(msg.id);
       if (p) { pending.delete(msg.id); msg.error ? p.rej(new Error(msg.error.message)) : p.res(msg.result); }
+      else if (msg.method) for (const l of listeners) l(msg);
     }
   });
   const exited = new Promise((r) => proc.on('exit', r));
@@ -91,6 +93,7 @@ export async function launchBrowser({ profile, headless = false, exe = findBrows
 
   return {
     proc, exe, extensionId, send, attach, exited,
+    onEvent(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     async open(url) { const { targetId } = await send('Target.createTarget', { url }); return attach(targetId); },
     async targets() { return (await send('Target.getTargets')).targetInfos; },
     async close() { await send('Browser.close').catch(() => {}); await Promise.race([exited, sleep(3000)]); if (proc.exitCode === null) proc.kill(); },

@@ -2,6 +2,7 @@
 // and drives every shield through its HTTP API using the extension's own crypto libs.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -350,9 +351,10 @@ await test('config: local mode exposes official + alternate origins', async () =
 });
 await test('provenance registry downloads for local matching, with absolute URLs', async () => {
   const reg = await getJson('/api/prov/registry');
-  assert.ok(Array.isArray(reg) && reg.length >= 1);
-  assert.match(reg[0].url, /^http:\/\/127\.0\.0\.1:\d+\/media\//);
-  assert.match(reg[0].dhash, /^[0-9a-f]{16}$/);
+  assert.ok(Array.isArray(reg) && reg.length >= 2);
+  assert.ok(reg.some((r) => /^http:\/\/127\.0\.0\.1:\d+\/media\//.test(r.url)), 'photos signed on this server get absolute URLs');
+  assert.ok(reg.some((r) => r.url.startsWith('https://raw.githubusercontent.com/')), 'the seeded GitHub-hosted demo photo is always listed');
+  for (const r of reg) assert.match(r.dhash, /^[0-9a-f]{16}$/);
 });
 
 console.log('\nEvidence receipts & scam-chain demo');
@@ -379,6 +381,40 @@ await test('demo shortener hops redirect only within the site (no open redirect)
   assert.deepEqual(await hop('/r?to=%2F%2Fevil.example'), [302, '/']);
   assert.deepEqual(await hop('/r?to=https%3A%2F%2Fevil.example'), [302, '/']);
 });
+
+console.log('\nCheck a link & real C2PA files');
+await test('a real C2PA file (c2pa-rs sample) is recognised and its signer details read', async () => {
+  const r = await prov.verifyImageBytes(new Uint8Array(fs.readFileSync(new URL('./fixtures/c2pa-CA.jpg', import.meta.url))), []);
+  assert.equal(r.status, 'c2pa');
+  assert.equal(r.c2pa.signer, 'C2PA Signer');
+  assert.equal(r.c2pa.issuer, 'Intermediate CA');
+  assert.match(r.c2pa.generator, /c2pa-rs/);
+  assert.match(r.c2pa.timestampAuthority, /DigiCert/);
+});
+// A stand-in "shortener": HTTP redirect, then a page that redirects itself with <meta refresh>.
+const side = http.createServer((req, res) => {
+  if (req.url === '/go') { res.writeHead(301, { location: '/meta' }); return res.end(); }
+  res.setHeader('content-type', 'text/html');
+  res.end(req.url === '/meta' ? '<meta http-equiv="refresh" content="0; url=/end"><p>loading</p>' : '<h1>landing page</h1>');
+});
+await new Promise((r) => side.listen(0, '127.0.0.1', r));
+const SIDE = `http://127.0.0.1:${side.address().port}`;
+const expand = (u) => api('/api/link/expand?url=' + encodeURIComponent(u));
+await test('link check follows HTTP and <meta refresh> redirects to where the link really lands', async () => {
+  const r = await expand(SIDE + '/go');
+  assert.deepEqual(r.hops.map((h) => [new URL(h.url).pathname, h.status, h.leaves || null]), [['/go', 301, 'redirect'], ['/meta', 200, 'page redirect'], ['/end', 200, null]]);
+  assert.equal(r.final, SIDE + '/end');
+  assert.equal(r.complete, true);
+  assert.equal(new URL((await expand(BASE + '/s/qk50')).final).pathname, '/claim.html');
+  assert.equal((await expand('ftp://example.com/x')).status, 400);
+  assert.equal((await expand('not a link')).status, 400);
+});
+await test('when hosted, link check refuses private-network targets (no SSRF)', async () => {
+  const { privateIp } = await import('../server/link.js');
+  for (const ip of ['10.0.0.1', '127.0.0.1', '192.168.1.1', '172.20.0.1', '169.254.169.254', '100.64.0.1', '::1', 'fd00::1', '::ffff:10.0.0.1']) assert.equal(privateIp(ip), true, ip);
+  for (const ip of ['8.8.8.8', '1.1.1.1', '172.32.0.1', '2606:4700::1111']) assert.equal(privateIp(ip), false, ip);
+});
+side.close();
 
 server.close();
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}\n`);

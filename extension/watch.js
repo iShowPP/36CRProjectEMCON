@@ -58,7 +58,11 @@ export function recordPageFacts(s, url, lure, data) {
 }
 
 // ---------- privacy record ----------
-const newPrivacy = (url) => ({ url, host: normDomain(new URL(url).hostname), started: Date.now(), hosts: {}, frames: {}, consent: null, promise: null });
+let gpcOn = false; // mirrors the setting: is Sec-GPC being sent?
+let onNewTracker = () => {};
+export const watchHooks = (h) => { onNewTracker = h.onNewTracker || onNewTracker; };
+export const setGpc = (on) => { gpcOn = !!on; };
+const newPrivacy = (url) => ({ url, host: normDomain(new URL(url).hostname), started: Date.now(), hosts: {}, frames: {}, consent: null, promise: null, gpc: gpcOn });
 
 export function featureTotals(p) {
   const t = {};
@@ -134,6 +138,7 @@ async function observeRequest(d) {
   let host;
   try { host = normDomain(new URL(d.url).hostname); } catch { return; }
   if (!host || sameSite(host, p.host)) return; // first-party traffic is not what the promise is about
+  if (!p.hosts[host] && trackerFor(host)) onNewTracker();
   const e = (p.hosts[host] ||= { n: 0, afterDenial: 0, tracker: trackerFor(host), first: d.timeStamp, types: [] });
   e.n++;
   if (p.consent?.state === 'denied' && d.timeStamp >= p.consent.at) e.afterDenial++;
@@ -142,6 +147,22 @@ async function observeRequest(d) {
 }
 
 // ---------- reports ----------
+const label = (u) => { const x = new URL(u); return (normDomain(x.hostname) + (x.pathname === '/' ? '' : x.pathname)).slice(0, 48); };
+
+/** The path of a link checked from the popup: hops followed by the server, plus the pasted message. */
+export function linkChainReport({ hops, message }) {
+  const H = hops.map((h) => ({ url: h.url, host: normDomain(new URL(h.url).hostname), via: h.via, label: label(h.url) }));
+  const msgLure = lureFindings(message).map((l) => ({ ...l, where: 'the message you pasted' }));
+  return {
+    hops: H,
+    redirects: H.filter((h) => /redirect/.test(h.via)).length,
+    sites: [...new Set(H.map((h) => registrable(h.host)))],
+    shorteners: [...new Set(H.map((h) => h.host).filter((h) => SHORTENERS.has(h)))],
+    lure: msgLure,
+    message: message ? { lure: msgLure.length, urls: urlsIn(message), linked: true } : null,
+  };
+}
+
 export function chainReport(s, currentUrl, currentLure = []) {
   const hops = s.chain.length ? s.chain : [];
   const n = hops.length;
@@ -154,7 +175,6 @@ export function chainReport(s, currentUrl, currentLure = []) {
   const msgLure = lureFindings(s.message).map((l) => ({ ...l, where: 'the message you pasted' }));
   const msgUrls = urlsIn(s.message);
   const linked = msgUrls.some((u) => { const h = normDomain(new URL(u).hostname); return hops.some((x) => x.host === h); });
-  const label = (u) => { const x = new URL(u); return (normDomain(x.hostname) + (x.pathname === '/' ? '' : x.pathname)).slice(0, 48); };
   return {
     hops: hops.map(({ url, host, via }) => ({ url, host, via, label: label(url) })),
     redirects: hops.filter((h) => /redirect/.test(h.via)).length,
@@ -200,6 +220,17 @@ export function privacyReport(s) {
   if (declared.includes('no-fingerprinting')) {
     promises.push({ text: 'No fingerprinting', source: 'declared by the site', status: fp.length ? 'broken' : 'kept', evidence: fp.length ? `Scripts ${fp.map((x) => `${x.label} (${x.n}×)`).join(', ')}` : 'No fingerprinting APIs used' });
   }
+  if (p.gpc) {
+    // GPC is a 'no' the site actually receives, on every request from the very first one
+    promises.push({
+      text: 'Honours your “do not sell or share” signal',
+      source: 'Global Privacy Control: a legal opt-out in California, Colorado and other US states; elsewhere a request',
+      status: trackers.length ? 'broken' : 'kept',
+      evidence: trackers.length
+        ? `Your browser sent Global Privacy Control with every request, yet the page loaded ${trackers.length} tracking domain(s): ${listHosts(trackers)}`
+        : 'Global Privacy Control was sent with every request and no known tracking domains were contacted',
+    });
+  }
   const afterT = trackers.filter((t) => t.afterDenial > 0);
   const afterFp = fp.filter((x) => x.afterDenial > 0);
   promises.push({
@@ -217,7 +248,7 @@ export function privacyReport(s) {
     host: p.host, since: p.started,
     thirdParties: third.slice(0, 40).map(({ host, n, tracker, afterDenial }) => ({ host, n, tracker, afterDenial })),
     thirdPartyCount: third.length, trackerCount: trackers.length,
-    features, consent: p.consent && { state: p.consent.state, how: p.consent.how, at: p.consent.at },
+    features, gpc: !!p.gpc, consent: p.consent && { state: p.consent.state, how: p.consent.how, at: p.consent.at },
     declared, promiseSource: p.promise?.source || null, promises,
   };
 }

@@ -158,6 +158,47 @@ export function stripManifest(b) {
   return b;
 }
 
+// ---------- real C2PA (Content Credentials) ----------
+
+// Reads a CBOR text string at `at` (major type 3, short lengths only).
+function cborText(b, at) {
+  const h = b[at];
+  if (h === undefined || h >> 5 !== 3) return null;
+  let len = h & 31, o = at + 1;
+  if (len === 24) { len = b[o]; o += 1; } else if (len === 25) { len = (b[o] << 8) | b[o + 1]; o += 2; } else if (len > 23) return null;
+  return o + len <= b.length ? td.decode(b.subarray(o, o + len)) : null;
+}
+
+function allIndexes(b, needle) {
+  const out = [];
+  for (let i = indexOf(b, needle), base = 0; i >= 0 && out.length < 32; i = indexOf(b.subarray(base), needle)) {
+    out.push(base + i);
+    base += i + 1;
+  }
+  return out;
+}
+
+/**
+ * Human-readable facts from a real C2PA manifest: what made it, who signed it, the title and
+ * the timestamp authority. Read from the embedded claim and certificates WITHOUT validating
+ * the certificate chain (that needs a full C2PA validator), and labelled as such in the UI.
+ */
+export function c2paSummary(b) {
+  const out = {};
+  const gen = indexOf(b, te.encode('claim_generator'));
+  if (gen >= 0) out.generator = cborText(b, gen + 'claim_generator'.length);
+  const title = indexOf(b, te.encode('dc:title'));
+  if (title >= 0) out.title = cborText(b, title + 'dc:title'.length);
+  // X.509 commonName (OID 2.5.4.3): the first certificate is the signer's (issuer CN, then subject CN)
+  const cns = allIndexes(b, new Uint8Array([0x06, 0x03, 0x55, 0x04, 0x03]))
+    .map((k) => (b[k + 6] < 128 && [0x0c, 0x13, 0x14, 0x16].includes(b[k + 5]) ? td.decode(b.subarray(k + 7, k + 7 + b[k + 6])) : null))
+    .filter(Boolean);
+  if (cns.length >= 2) { out.issuer = cns[0]; out.signer = cns[1]; }
+  out.timestampAuthority = cns.find((c) => /time ?stamp/i.test(c)) || null;
+  for (const k of Object.keys(out)) if (!out[k]) delete out[k];
+  return out;
+}
+
 export async function signManifest(fields, privateKey) {
   return { ...fields, sig: toB64u(await ed25519Sign(privateKey, canonicalJson(fields))) };
 }
@@ -174,7 +215,7 @@ export async function signManifest(fields, privateKey) {
 export async function verifyImageBytes(b, trustList = []) {
   const { format, manifest, c2pa } = extractManifest(b);
   if (!format) return { status: 'unsupported' };
-  if (!manifest) return { status: c2pa ? 'c2pa' : 'none', format };
+  if (!manifest) return c2pa ? { status: 'c2pa', format, c2pa: c2paSummary(b) } : { status: 'none', format };
   const { sig, ...fields } = manifest;
   const trusted = trustList.find((k) => k.keyId === fields.issuer?.keyId && !k.revoked);
   // A manifest that names a trusted keyId is checked against the trust-list key,

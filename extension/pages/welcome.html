@@ -6,46 +6,63 @@
   <title>Welcome to EMCON</title>
   <link rel="stylesheet" href="pages.css">
   <style>
-    body { padding: 40px 16px 64px; }
-    .wrap { max-width: 780px; margin: 0 auto; }
-    .mast { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 18px; }
-    .mast img { width: 40px; height: 40px; }
-    .mast h1 { font-size: 30px; }
-    .lede { font: 18px/1.5 var(--serif); color: var(--ink-2); margin: 0 0 22px; max-width: 60ch; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 0; border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); margin-bottom: 18px; }
-    .cell { padding: 14px 16px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: var(--sheet); }
-    .cell h2 { font-size: 16px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-    .cell p { font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
-    .tag.ok { color: var(--ok); }
+    body { padding: 40px 16px 64px; font-size: 15px; }
+    .wrap { max-width: 860px; margin: 0 auto; }
+    .hero-top { display: flex; align-items: center; gap: 18px; margin-bottom: 8px; }
+    .hero-top img { width: 64px; height: 64px; }
+    .hero-top h1 { font-size: 34px; }
+    .lede { font-size: 18px; color: var(--text-2); margin: 6px 0 26px; max-width: 46em; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+    .n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-weight: 700; }
+    .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); }
+    .chip i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; font: 700 13px var(--font); font-style: normal; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 12px 0 18px; }
+    .feat { display: flex; flex-direction: column; gap: 6px; }
+    .feat .head { display: flex; align-items: center; gap: 10px; }
+    .feat .fi { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--primary-tint); color: var(--primary); flex: none; }
+    .feat h2 { font-size: 16px; flex: 1; }
+    .feat p { font-size: 14px; color: var(--text-2); margin: 0; }
+    .feat .pill { align-self: flex-start; }
+    h3.sec { font-size: 18px; margin: 28px 0 4px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="mast"><img src="../icons/icon128.png" alt=""><div><div class="kicker">Installed</div><h1>EMCON is on</h1></div></div>
-    <p class="lede">EMCON checks the pages, images and payment flows you run into, and shows you its evidence. It never gives you a black-box score.</p>
+    <div class="hero-top"><img src="../icons/icon128.png" alt=""><div><div class="label">Installed and running</div><h1>EMCON is on</h1></div></div>
+    <p class="lede">EMCON checks the websites, links, photos and payments you come across, and always tells you why. No black-box scores.</p>
 
-    <div class="card">
-      <h2>First: pin EMCON to your toolbar</h2>
-      <p class="small">Click the puzzle-piece icon at the top right of the browser, then the pin next to <b>EMCON</b>. The icon shows <b>!</b> on dangerous pages, <b>?</b> where you should be careful, and <b>✓</b> on sites your network trusts.</p>
-    </div>
-
-    <div class="grid">
-      <div class="cell"><h2>Anti-fingerprinting <span class="tag ok">active now</span></h2><p>Sites can't follow you across the web using your device's canvas, graphics card or audio fingerprint.</p></div>
-      <div class="cell"><h2>Image provenance <span class="tag ok">active now</span></h2><p>Photos signed by trusted publishers are labelled Verified; edited copies are labelled Altered. Unsigned images get no label: missing provenance doesn't mean an image is fake.</p></div>
-      <div class="cell"><h2>Privacy promise monitor <span class="tag ok">active now</span></h2><p>Records which third parties a page contacts and which sensitive features it uses, then checks whether tracking stops after you say no.</p></div>
-      <div class="cell"><h2>Scam and phishing checks <span class="tag" id="t-wot">needs server</span></h2><p>Blocks fake login pages, look-alike addresses and live phishing sites, and follows the chain of redirects that led you there.</p></div>
-      <div class="cell"><h2>Ghost sign-in <span class="tag" id="t-ghost">needs setup</span></h2><p>Sign up on sites that accept EMCON as a verified adult without sharing your email, phone or name.</p><button id="ghost" style="margin-top:8px">Set up Ghost</button></div>
-      <div class="cell"><h2>Evidence receipts <span class="tag ok">active now</span></h2><p>Export a signed, timestamped receipt of any check to share with a friend, teacher or security team.</p></div>
-    </div>
-
-    <div class="card">
-      <h2>EMCON server</h2>
-      <p class="small muted">Ghost, scam reports, the live phishing feed and receipt timestamps come from an EMCON server. The other checks run entirely in your browser.</p>
-      <div class="row" style="margin-top:8px">
-        <input id="server" style="flex:1" placeholder="https://your-emcon-server.example">
-        <button id="check" class="primary">Save &amp; check</button>
+    <div class="card step">
+      <span class="n">1</span>
+      <div>
+        <h2 style="font-size:18px">Pin EMCON to your toolbar</h2>
+        <p class="muted" style="margin:4px 0 0">Click the puzzle-piece icon at the top right of your browser, then the pin next to <b>EMCON</b>. The icon then shows you each site's result at a glance:</p>
+        <div class="chips">
+          <span class="chip"><i style="background:#b42318">!</i>Very likely a scam</span>
+          <span class="chip"><i style="background:#b54708">?</i>Be careful</span>
+          <span class="chip"><i style="background:#067647">✓</i>Trusted by your network</span>
+        </div>
       </div>
-      <div id="status" class="small" style="margin-top:6px"></div>
+    </div>
+
+    <h3 class="sec">What's protecting you</h3>
+    <div class="grid">
+      <div class="card feat"><div class="head"><span class="fi" data-icon="shield"></span><h2>Scam and phishing checks</h2></div><p>Blocks fake login pages, look-alike addresses and live phishing sites, and follows the trail of redirects that brought you there.</p><span class="pill role-caution" id="t-wot">needs server</span></div>
+      <div class="card feat"><div class="head"><span class="fi" data-icon="message"></span><h2>Check a message</h2></div><p>Paste a suspicious SMS or WhatsApp message into EMCON. It follows the link without opening it.</p><span class="pill role-safe">active now</span></div>
+      <div class="card feat"><div class="head"><span class="fi" data-icon="eye"></span><h2>Privacy promise monitor</h2></div><p>Shows which companies track you on each page, and whether tracking stops after you say no.</p><span class="pill role-safe">active now</span></div>
+      <div class="card feat"><div class="head"><span class="fi" data-icon="fingerprint"></span><h2>Anti-fingerprinting</h2></div><p>Adds invisible noise so sites can't recognise your device from one visit to the next.</p><span class="pill role-safe">active now</span></div>
+      <div class="card feat"><div class="head"><span class="fi" data-icon="image"></span><h2>Photo labels</h2></div><p>Photos signed by publishers you trust say <i>Verified</i>; edited copies say <i>Altered</i>. Unsigned photos get no label.</p><span class="pill role-safe">active now</span></div>
+      <div class="card feat"><div class="head"><span class="fi" data-icon="ghost"></span><h2>Ghost sign-in</h2></div><p>Sign up on sites that accept EMCON as a verified adult, without your email, phone or name.</p><span class="pill role-neutral" id="t-ghost">needs setup</span><button id="ghost" class="sm" style="align-self:flex-start;margin-top:4px">Set up Ghost</button></div>
+    </div>
+
+    <div class="card">
+      <div class="head row" style="gap:10px"><span class="fi" data-icon="server" style="display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:var(--primary-tint);color:var(--primary)"></span><h2 style="font-size:17px">Your EMCON server</h2></div>
+      <p class="muted small" style="margin:8px 0 10px">Scam reports, the live phishing feed, link checks, Ghost and receipt timestamps come from an EMCON server. Everything else runs entirely in your browser.</p>
+      <div class="row" style="flex-wrap:nowrap">
+        <input id="server" class="mono" placeholder="https://your-emcon-server.example">
+        <button id="check" class="primary" style="flex:none">Save and check</button>
+      </div>
+      <div id="status" class="small" style="margin-top:8px"></div>
     </div>
   </div>
   <script type="module" src="welcome.js"></script>

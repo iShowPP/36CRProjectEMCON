@@ -2,36 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Set up EMCON Ghost</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set Up EMCON Ghost</title>
   <link rel="stylesheet" href="pages.css">
-  <style> body { padding: 40px 16px; } .wrap { max-width: 580px; margin: 0 auto; } h1 { margin: 4px 0 8px; } .step { font: 600 12px var(--mono); color: var(--muted); } </style>
+  <style>
+    body { padding: 40px 16px 64px; font-size: 15px; }
+    .wrap { max-width: 620px; margin: 0 auto; }
+    .top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .top .gi { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--primary-tint); color: var(--primary); }
+    .lede { color: var(--text-2); margin: 6px 0 20px; font-size: 16px; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 14px; }
+    .n { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--on-primary); font-weight: 700; }
+    .step h2 { font-size: 17px; margin-bottom: 4px; }
+    .step p { color: var(--text-2); font-size: 14px; }
+    details summary { cursor: pointer; color: var(--primary); font-weight: 600; font-size: 14px; margin-top: 10px; }
+  </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="kicker">EMCON · Ghost sign-in</div>
-    <h1>Set up Ghost</h1>
-    <p class="muted">You verify yourself <b>once</b> with an issuer. In return you get a batch of <i>blind</i> tokens: the issuer signs them without seeing them, so it can never tell where you spend them.</p>
+    <div class="top"><span class="gi" data-icon="ghost" data-size="28"></span><div><div class="label">EMCON Ghost sign-in</div><h1>Set up Ghost</h1></div></div>
+    <p class="lede">Verify yourself <b>once</b>. In return you get a set of <i>blind</i> tokens: the issuer signs them without seeing them, so it can never tell which sites you use them on.</p>
 
-    <div class="card">
-      <div class="step">Step 1</div>
-      <h2>Lock Ghost to you</h2>
-      <p class="small muted">Every sign-in needs your fingerprint, face, security key or PIN, so malware or a borrowed laptop can't quietly use your identities.</p>
-      <button id="passkey" class="primary">Use a passkey (Windows Hello, Touch ID, security key)</button>
-      <div id="pkMsg" class="small" style="margin-top:6px"></div>
-      <details style="margin-top:8px"><summary class="small">No passkey? Use a local PIN instead</summary>
-        <label for="pin">PIN (4+ digits)</label><input id="pin" type="password" inputmode="numeric">
-      </details>
+    <div class="card step">
+      <span class="n">1</span>
+      <div>
+        <h2>Lock Ghost to you</h2>
+        <p>Every sign-in will need your fingerprint, face, security key or PIN, so malware or a borrowed laptop can't quietly use your identities.</p>
+        <button id="passkey" class="primary"><span data-icon="key"></span>Use a passkey (Windows Hello, Touch ID, security key)</button>
+        <div id="pkMsg" class="small" style="margin-top:8px"></div>
+        <details><summary>No passkey? Use a PIN instead</summary>
+          <label for="pin">PIN (4 or more digits)</label><input id="pin" type="password" inputmode="numeric">
+        </details>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="step">Step 2</div>
-      <h2>One-time verification (demo issuer)</h2>
-      <p class="small muted">In production this is an ID scan, a bank KYC check or a national eID. The demo issuer only needs your date of birth. It keeps the eligibility result ("18+: yes") and discards the date.</p>
-      <label for="dob">Date of birth</label><input id="dob" type="date" value="1998-05-14">
+    <div class="card step">
+      <span class="n">2</span>
+      <div>
+        <h2>One-time check (demo issuer)</h2>
+        <p>In real use this is an ID scan, a bank KYC check or a national eID. The demo issuer only needs your date of birth. It keeps the result ("18+: yes") and throws the date away.</p>
+        <label for="dob">Date of birth</label><input id="dob" type="date" value="1998-05-14">
+      </div>
     </div>
 
-    <button id="go" class="primary">Verify &amp; get tokens</button>
-    <div id="msg" class="small" style="margin-top:10px"></div>
+    <button id="go" class="primary block" style="margin-top:16px;min-height:48px;font-size:15px"><span data-icon="shieldCheck"></span>Verify and get my tokens</button>
+    <div id="msg" class="small" style="margin-top:12px"></div>
   </div>
   <script type="module" src="setup.js"></script>
 </body>

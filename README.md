@@ -15,7 +15,7 @@ AI detectors fail in two directions: they flag real content, and attackers learn
 | **Provenance** | "Is this image AI-generated?" | "Who signed it, and has it changed since?" | Ed25519 manifests in PNG/JPEG (C2PA-lite), perceptual-hash soft binding |
 | **Ghost sign-in** | "Who is this user?" | "Can they *prove* they're a verified adult, without revealing who they are?" | RSA blind signatures (RFC 9474-style), per-site Ed25519 keys, WebAuthn |
 | **Honey-Vault** | "Does this payment look fraudulent?" | "Has it waited out a risk-scaled delay and passed check-ins and guardians?" | Time-locks, m-of-n guardians, duress decoy, Solidity contract |
-| **Anti-fingerprinting** | (nothing) | "Can a tracker recognise this device on the next site?" | Deterministic per-site noise, bucketed hardware values |
+| **Anti-fingerprinting** | (nothing) | "Can a tracker recognise this device on the next visit?" | Secret per-visit noise applied before any page script, bucketed hardware values, Global Privacy Control |
 
 ---
 
@@ -36,17 +36,20 @@ The same zip is what you'd upload to the Chrome Web Store.
 
 ## Works on real websites
 
-EMCON protects the whole web, not just the demo pages:
+EMCON protects the whole web, not just the demo pages. **Step-by-step guide for every shield on real sites: [emcon-e2tu.onrender.com/real.html](https://emcon-e2tu.onrender.com/real.html)** (also `/real.html` on your own server).
 
 | On real sites | How |
 |---|---|
 | **Live phishing sites are blocked** | The server imports the [OpenPhish](https://openphish.com) community feed every 6 hours (≈250–300 live phishing sites) and signs each entry as an attestation. The extension follows the feed by default (you can remove it like any other source). Shared hosts such as `sites.google.com` and brands' own domains are never flagged. |
 | **Look-alike addresses are flagged** | `paypa1-secure.com`, `micros0ft-login.net`, `hdfcbank-kyc.top`: the hostname borrows a real brand (PayPal, Google, Microsoft, Apple, Amazon, Meta, SBI, HDFC, ICICI, Axis, Paytm and more), with digit-for-letter swaps and one-letter typos undone, without being that brand's official domain. RBI's verified `.bank.in` zone counts as official for Indian banks. |
 | **Brand-new domains** | Registration dates come from the public RDAP registry. |
-| **Anti-fingerprinting** | Works everywhere. Try [browserleaks.com/canvas](https://browserleaks.com/canvas). |
-| **Real Content Credentials** | Photos carrying C2PA manifests get an ⓘ badge on any site. |
+| **Check a link** | Paste a link or a whole SMS into the popup. The server follows its redirects (HTTP 3xx and `<meta refresh>`) so your browser never opens it, then the usual checks run on where it lands. Tested with live OpenPhish sites (risk 93, "very likely a scam") and real short links (`youtu.be`, `aka.ms`: no warning). |
+| **Anti-fingerprinting** | Registered to run before any page script, so [browserleaks.com/canvas](https://browserleaks.com/canvas) shows a new signature on every visit, and your real, stable one when you turn protection off for the site. [browserleaks.com/webgl](https://browserleaks.com/webgl) sees a common GPU. |
+| **Privacy promises** | Most sites outside Europe never show a cookie banner, so EMCON sends **Global Privacy Control** (`Sec-GPC: 1` and `navigator.globalPrivacyControl`), a "do not sell or share" signal the site receives, then checks whether trackers still load. In our tests Times of India, CNN, Forbes and Wired loaded 43–48 tracking domains each despite it. |
+| **Real Content Credentials** | Photos carrying C2PA manifests get a badge with the signer, issuer and timestamp authority read from the file, e.g. the [c2pa-rs sample](https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/CA.jpg). |
+| **Signed photos on other hosts** | [docs/media](docs/media) holds a photo signed by the live server's newsroom key and an edited copy. On GitHub they verify as *Verified* and *Altered*; re-encoded by the images.weserv.nl CDN (signature stripped) the copy is *Recovered* from its visual fingerprint. |
 
-Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, SBI): none of them triggers a warning.
+Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, PayPal, SBI, HDFC NetBanking, Instagram login): none of them triggers a warning.
 
 ## Host the server
 
@@ -96,17 +99,23 @@ This starts the server on `:8787` and opens a browser window with the EMCON exte
 ### Tests
 
 ```bash
-npm test               # 41 API tests against the live server
-npm run test:browser   # 22 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, privacy promises, receipts
+npm test               # 44 API tests against the live server
+npm run test:browser   # 25 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts
 npm run test:all       # both
 ```
 
 Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
 
+## Design
+
+The interface was rebuilt from a study of the five closest consumer products (Malwarebytes Browser Guard, Ghostery, Bitdefender Web Sage / Scamio, DuckDuckGo, Norton 360 / Genie) plus Chrome's Safe Browsing page and Truecaller: one status said three ways (icon, colour, plain word), advice before evidence, the path drawn like parcel tracking, scam phrases highlighted in your message, a red *Back to safety* page, and nothing smaller than 12 px. The study, our users and the rules we adopted: [docs/ui-research.md](docs/ui-research.md).
+
 ## 5-minute judge demo
 
+These use the demo pages, where every case is guaranteed to appear. For the same shields on real websites, follow [/real.html](https://emcon-e2tu.onrender.com/real.html).
+
 1. **Ghost sign-in.** Open `localhost:8787/rp.html` → *Continue with EMCON Ghost* → approve. ShopNorth creates an 18+ account knowing **no email, name or phone**. Then open `127.0.0.1:8787/rp.html` (playing a *different company*) and sign in again: you get a **different, unlinkable pseudonym**.
-2. **Fake media.** Open `/sign.html` → *Generate a sample photo* → *Build the full demo feed* → open `/feed.html`. Labels: *Verified* original, *Altered after signing* on the doctored copy that carries the real signature, *Recovered* for the stripped re-upload, *Signed · unknown signer*. The unsigned photo gets **no** label. Click a label → *Export evidence receipt*.
+2. **Fake media.** Open `/sign.html` → *Generate a sample photo* → *Build the full demo feed* → open `/feed.html`. Labels: *Verified* original, *Altered after signing* on the doctored copy that carries the real signature, *Recovered* for the stripped re-upload, *Signed · unknown signer*. The unsigned photo gets **no** label. Click a label → *Save signed proof*.
 3. **Phishing clone.** Open `127.0.0.1:8787/phish-login.html` and EMCON puts up a full-page block. Its reasons: structural match to Kestrel Bank's login (clone distance 0/64) on a non-official domain, a credential form on a raw IP, and a scam report from a security group in your web of trust. The real `localhost:8787/bank-login.html` stays clean.
 4. **Pig-butchering payment.** On `/vault.html` log in with PIN `1234`. Send $2,500 to *CryptoYield Pro*: it's held for guardians, because the payee is new **and** its website is flagged in the web of trust. Open a guardian console from *Demo controls* and veto it. The money comes back.
 5. **Scam-script check-in.** Send $800 to the landlord → cooling-off. Answer **Yes** to "were you told to keep it secret?" and the payment escalates to guardians, who see your answers.
@@ -114,7 +123,7 @@ Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe
 7. **Thief disables protections first.** In settings, try raising the instant limit. It's **time-locked for 24 h** and guardians are notified. Lowering it applies instantly.
 8. **Scam chain.** Open `/sms.html` and tap the link in the "prize" SMS. It redirects twice (`/s/qk50` → `/r`) to a QuickKart "claim" page asking for card number, CVV and OTP. EMCON blocks it, and the block page lists every stage: prize wording → 2 redirects → QuickKart's name on an unofficial site → card and OTP fields, plus the exact path.
 9. **Privacy promise.** Open `/news.html`. The page declares *no third-party tracking* and *respects consent*. Click **Reject all**, then the EMCON icon → **Privacy**: both promises are **broken**, with the tracker domain contacted after you said no and the canvas fingerprinting that followed.
-10. **Evidence receipt.** On the blocked claim page, click the EMCON icon → **Export signed receipt**. Download it, open `/verify.html` and drop the file in: *signature valid, timestamped by this server*. Change one character and verify again: *altered or forged*.
+10. **Evidence receipt.** On the blocked claim page, click the EMCON icon → **Save signed proof of this check**. Download it, open `/verify.html` and drop the file in: *signature valid, timestamped by this server*. Change one character and verify again: *altered or forged*.
 
 ---
 
@@ -129,7 +138,8 @@ Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe
 | A phishing site can relay your sign-in to the real site. | The extension signs over the **real origin from Chrome** (`sender.origin`), not one the page claims. Relayed presentations fail. |
 | Any page could silently request your identity. | Every request opens a **consent window** gated by passkey (WebAuthn UV) or PIN. |
 | Reusing one token on two sites would link them. | Tokens are consumed on use and never shown twice. Logins on a returning site need no token. |
-| "Randomise screen size / locale" breaks sites, gets caught by CSS media queries and `Intl`, and random-per-read noise is *itself* a fingerprint. | Noise is a **pure function of a secret seed and the pixel index**, so it's stable within a site and different across sites (and per top-site/iframe pair, which defeats third-party tracker iframes). High-entropy values are **bucketed to the most common value**. Screen, locale and timezone are never faked. Wrappers pass `toString()` checks. |
+| "Randomise screen size / locale" breaks sites, gets caught by CSS media queries and `Intl`, and random-per-read noise is *itself* a fingerprint. | Noise is a **pure function of a secret seed and the pixel index**: reading twice on a page gives the same answer, but every visit (and every site) gets a new seed, so visits can't be linked. The seed is made inside the page guard's closure and never exposed. High-entropy values are **bucketed to the most common value**. Screen, locale and timezone are never faked. |
+| An extension that injects after the page loads is too late: fingerprinting code runs first. | The guard is a **registered MAIN-world script at `document_start`**, so Chrome runs it before the page's first script (verified on browserleaks.com). A fresh `about:blank` iframe can't be used to fetch untouched functions: same-origin frames are patched the moment the page touches `.contentWindow`. Wrappers look native: `toString()`, no `prototype`, not constructible. |
 
 ### 🖼️ 2. Provenance
 | Loophole | Fix |
@@ -176,7 +186,8 @@ Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe
 |---|---|
 | "We respect your privacy" can't be checked. | Promises are machine-readable (`<meta name="privacy-promise" content="no-third-party-tracking respects-consent">`), and every site is also held to the legal baseline (tracking stops after you say no, under GDPR and India's DPDP Act). Each result cites the domains and features your browser actually observed. |
 | Fingerprinting scripts look innocent in the network log. | A page-side monitor shares the anti-fingerprinting wrappers (so it passes `toString()` checks) and counts canvas readback, GPU queries, audio probing, font probing, location, camera, clipboard and beacons, per frame. |
-| Did the user actually say no? | Clicking a banner's "Reject all" / "Decline" / "Only necessary" is recorded automatically, including inside consent-manager iframes, or you press **I said no** in the popup. Everything after that moment is counted separately. |
+| Outside Europe most sites never show a cookie banner, so there is no "no" to test. | EMCON sends **Global Privacy Control** with every request (`Sec-GPC: 1` via declarativeNetRequest) and to page scripts (`navigator.globalPrivacyControl`), then reports every tracking domain that still loads. The row says where GPC is a legal opt-out (California, Colorado and other US states) and that elsewhere it is a request. |
+| Did the user actually say no? | Clicking a banner's "Reject all" / "Decline" / "Only necessary" is recorded automatically, including inside consent-manager iframes, or you press **I said no to tracking here** in the popup. Everything after that moment is counted separately. |
 
 ### 7. Evidence receipts
 | Loophole | Fix |
@@ -197,8 +208,11 @@ extension/  (Chrome MV3, no build step)
   background.js     service worker: holds every secret, makes every decision, builds receipts
   watch.js          per-tab observers: redirect chain + third-party requests and consent
   content/bridge.js page facts → worker; renders labels / warnings in a closed shadow DOM (every frame)
+  content/guard.js  anti-fingerprinting + privacy feature monitor + GPC, MAIN world at document_start;
+                    content/cfg/*.js switch its parts on (registered by the worker from your settings)
   lib/              shared code, also imported by the server and the demo pages
     signals.js      lure phrases, link shorteners, sensitive form fields
+    icons.js        line icons + the one-meaning-per-status table (icon, colour, plain word)
     trackers.js     known tracking domains
     receipt.js      receipt digest + verification (signature and timestamp)
     domains.js      registrable-domain helpers
@@ -208,20 +222,21 @@ extension/  (Chrome MV3, no build step)
     trustgraph.js   personal trust propagation with per-root Sybil budgets
     simhash.js      DOM-structure SimHash
     dhash.js        perceptual hash
-    farble.js       anti-fingerprinting + privacy feature monitor (MAIN world)
-  pages/            popup, receipt, welcome (first install), Ghost setup, sign-in consent window
+  pages/            popup, receipt, welcome (first install), Ghost setup, sign-in consent window;
+                    pages.css + ui.js: the shared design system (see docs/ui-research.md)
   icons/            toolbar + store icons
 
 server/  (Node 22+, zero dependencies)
+  link.js    "Check a link": follows redirects server-side (SSRF guard, timeouts, rate limit)
   issuer.js  blind-token issuer        rp.js     "ShopNorth" relying party
   prov.js    signing + soft-binding    vault.js  Kestrel Bank Honey-Vault engine
   wot.js     attestation relay + brand fingerprints + live phishing feed
   timestamp.js  receipt timestamps (signs digest + time, never sees contents)
 
 web/        demo pages (overview, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone,
-            prize SMS + claim page, newspaper, receipt verifier)
+            prize SMS + claim page, newspaper, receipt verifier, real-internet guide)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (41 API tests) · extension.mjs (22 real-browser tests)
+test/       e2e.mjs (44 API tests) · extension.mjs (25 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
 scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)
@@ -232,7 +247,9 @@ scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.c
 - **Not audited.** This is hackathon code. `GuardedVault.sol` has not been compiled in CI or audited.
 - **Blind RSA vs zk-SNARKs:** blind signatures give unlinkability and simple, fast verification. Selective disclosure of arbitrary attributes (e.g. "lives in EU") would need BBS+ or zk circuits (Circom). That's the roadmap.
 - **Demo issuer** checks only a date of birth. Production plugs in real KYC, a bank, or a government eID.
-- **Anti-fingerprinting runs as an extension**, injected at navigation commit. A page script that runs extremely early could, in rare cases, read values before the wrappers are in place. Brave-grade protection needs to live in the browser engine. Web Workers aren't covered yet.
+- **Anti-fingerprinting runs as an extension.** It starts before page scripts, but Web Workers (an `OffscreenCanvas` in a worker) aren't covered, nor is a same-origin frame reached through `window[0]` before anything touches its `.contentWindow`. Determined scripts can spot that values are noised (they can't undo it). Brave-grade protection lives in the browser engine; in Brave, its own randomisation already applies.
+- **GPC is a request, not a block.** It is legally binding in California, Colorado and several other US states. Elsewhere a site may ignore it, and the privacy report shows exactly that. A tracker loading isn't proof that data was sold; the report lists what loaded, not what happened to the data.
+- **Check a link fetches the link from the EMCON server**, so the scam site sees the server's address, not yours. Sites that only show their scam to phones or to certain countries may look harmless to the server.
 - **The WebAuthn gate is a local user-presence check.** Encrypting the master secret with the passkey's PRF output is next on the roadmap.
 - **"C2PA-lite"** uses its own manifest format. It detects real C2PA but doesn't fully validate it (that needs the c2pa-rs SDK).
 - **Registrable-domain logic** uses a small built-in suffix list rather than the full Public Suffix List.
