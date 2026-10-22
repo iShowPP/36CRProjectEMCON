@@ -4,10 +4,15 @@
   "version": "1.0.0",
   "description": "Ghost identities, media provenance badges, web-of-trust phishing defence and anti-fingerprinting. No AI guesswork, just cryptography.",
   "minimum_chrome_version": "137",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "permissions": ["storage", "scripting", "webNavigation"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "pages/popup.html", "default_title": "EMCON" },
+  "action": {
+    "default_popup": "pages/popup.html",
+    "default_title": "EMCON",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],

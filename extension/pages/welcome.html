@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to EMCON</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    body { max-width: 760px; margin: 32px auto; padding: 0 16px 48px; }
+    .hero { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+    .hero img { width: 56px; height: 56px; }
+    .hero h1 { font-size: 28px; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .card h2 { font-size: 15px; }
+    .card p { margin: 4px 0 0; font-size: 13px; }
+    .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--line); margin-left: 6px; vertical-align: middle; }
+    ol li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="hero"><img src="../icons/icon128.png" alt=""><div><h1>EMCON is on</h1><div class="muted">Four shields that work by proof, not guesswork.</div></div></div>
+
+  <div class="card" style="margin-top:18px">
+    <h2>First, pin EMCON to your toolbar</h2>
+    <p>Click the puzzle-piece icon at the top right of Chrome, then the pin next to <b>EMCON</b>. The shield shows ✓ / ? / ! for every site you visit.</p>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h2>🕵️ Anti-fingerprinting <span class="tag ok">active now</span></h2><p>Sites can no longer track you across the web by your device's canvas, GPU or audio fingerprint.</p></div>
+    <div class="card"><h2>🖼️ Image provenance <span class="tag ok">active now</span></h2><p>Images signed by trusted publishers get a ✔ badge, and edited copies get ✖. Unsigned images get no badge, because missing provenance doesn't mean an image is fake.</p></div>
+    <div class="card"><h2>🕸️ Scam &amp; phishing shield <span class="tag" id="t-wot">needs server</span></h2><p>Blocks fake login pages and sites that people you trust have reported as scams.</p></div>
+    <div class="card"><h2>👻 Ghost sign-in <span class="tag" id="t-ghost">needs setup</span></h2><p>Sign up on websites as a verified adult without sharing your email, phone or name.</p><button id="ghost" style="margin-top:8px">Set up Ghost</button></div>
+  </div>
+
+  <div class="card">
+    <h2>EMCON server</h2>
+    <p class="small muted">Ghost, the scam reports and recovering provenance for stripped images talk to an EMCON server. The other shields work without one.</p>
+    <div class="row" style="margin-top:8px">
+      <input id="server" style="flex:1" placeholder="https://your-emcon-server.example">
+      <button id="check" class="primary">Save &amp; check</button>
+    </div>
+    <div id="status" class="small" style="margin-top:6px"></div>
+  </div>
+
+  <script type="module" src="welcome.js"></script>
+</body>
+</html>

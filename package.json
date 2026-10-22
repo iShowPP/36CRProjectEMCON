@@ -6,8 +6,14 @@
   "private": true,
   "engines": { "node": ">=22" },
   "scripts": {
+    "demo": "node scripts/demo.mjs",
+    "demo:fresh": "node scripts/demo.mjs --fresh",
     "start": "node server/index.js",
     "test": "node test/e2e.mjs",
-    "reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\""
+    "test:browser": "node test/extension.mjs",
+    "test:all": "node test/e2e.mjs && node test/extension.mjs",
+    "pack": "node tools/pack.mjs",
+    "icons": "node tools/make-icons.mjs",
+    "reset":"node -e \"require('fs').rmSync('data',{recursive:true,force:true})\""
   }
 }

@@ -13,23 +13,51 @@ AI detectors fail in two directions: they flag real content, and attackers learn
 
 ---
 
-## Quick start (2 minutes)
+## Install the extension (for users)
 
-Requires **Node 22+** (no `npm install`, zero dependencies) and **Chrome/Edge 137+**.
+EMCON is a browser extension for **Chrome, Edge and Brave** (version 137+).
+
+1. Download `emcon-extension-v1.0.0.zip` and unzip it. (Building it yourself: `npm run pack` writes it to `dist/`.)
+2. Open `chrome://extensions` (`edge://extensions` in Edge) and turn on **Developer mode**.
+3. Click **Load unpacked** and choose the unzipped **`emcon-extension`** folder.
+4. A welcome page opens. Pin EMCON to the toolbar, enter your EMCON server address, and optionally set up Ghost.
+
+What works where:
+- **No server needed:** anti-fingerprinting and image signature checks start working straight away.
+- **Needs an EMCON server:** Ghost sign-in, scam reports, and recovering provenance for stripped images. The server is the `server/` folder (`npm start`); host it anywhere that runs Node 22.
+
+The same zip is what you'd upload to the Chrome Web Store.
+
+## Quick start for the demo (one command)
+
+Requires **Node 22+** (no `npm install`, zero dependencies) and **Chrome, Edge or Brave**.
 
 ```bash
-npm start
+npm run demo
 ```
 
-1. Open **http://localhost:8787**. That's the demo hub.
-2. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the `extension/` folder.
-3. Click the 🛡️ toolbar icon → **Ghost** → **Set up Ghost** (passkey, or a PIN as fallback).
+On Windows you can also just double-click **`start-demo.cmd`**.
 
-Run the test suite (34 end-to-end tests against the real server):
+This starts the server on `:8787` and opens a browser window with the EMCON extension **already loaded**, in its own profile (`data/browser-profile`), so your normal browser is never touched. It also sets up Ghost with demo PIN **2468**, so every flow works straight away. Close the window (or press Ctrl+C) to stop.
+
+- `npm run demo:fresh` starts from a clean profile so you can show the Ghost setup (passkey/PIN) yourself.
+- `npm start` runs only the server. Then load the extension by hand: `chrome://extensions` → **Developer mode** → **Load unpacked** → pick `extension/`.
+
+| PIN | Where |
+|---|---|
+| `2468` | Ghost sign-in consent window |
+| `1234` | Kestrel Bank vault (real) |
+| `9999` | Kestrel Bank vault (duress) |
+
+### Tests
 
 ```bash
-npm test
+npm test               # 34 API tests against the live server
+npm run test:browser   # 13 tests that load the real extension into headless Chrome: install flow + all four shields
+npm run test:all       # both
 ```
+
+Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
 
 ## 5-minute judge demo
 
@@ -106,7 +134,8 @@ extension/  (Chrome MV3, no build step)
     simhash.js      DOM-structure SimHash
     dhash.js        perceptual hash
     farble.js       anti-fingerprinting (MAIN world)
-  pages/            popup, Ghost setup, sign-in consent window
+  pages/            popup, welcome (first install), Ghost setup, sign-in consent window
+  icons/            toolbar + store icons
 
 server/  (Node 22+, zero dependencies)
   issuer.js  blind-token issuer        rp.js     "ShopNorth" relying party
@@ -115,7 +144,10 @@ server/  (Node 22+, zero dependencies)
 
 web/        demo pages (hub, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs, 34 tests against the live server
+test/       e2e.mjs (34 API tests) · extension.mjs (13 real-browser tests)
+tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
+            pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
+scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)
 ```
 
 Optional: set `EMCON_ALERT_WEBHOOK=https://ntfy.sh/<topic>` to push guardian alerts to phones.

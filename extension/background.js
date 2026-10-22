@@ -126,11 +126,17 @@ async function ghostRequest(msg, sender) {
   if (isNewSite && !g.tokens[bundle]?.length) throw new Error('Out of humanity tokens. Open the popup to refill.');
 
   const id = toHex(randomBytes(8));
-  const ok = await new Promise(async (resolve) => {
-    approvals.set(id, { resolve, origin, claims, bundle, isNewSite, unlock: g.credId ? 'passkey' : 'pin', credId: g.credId });
+  let resolve;
+  const decision = new Promise((r) => { resolve = r; });
+  approvals.set(id, { resolve, origin, claims, bundle, isNewSite, unlock: g.credId ? 'passkey' : 'pin', credId: g.credId });
+  try {
     const w = await chrome.windows.create({ url: chrome.runtime.getURL(`pages/approve.html?id=${id}`), type: 'popup', width: 440, height: 600 });
     approvals.get(id).windowId = w.id;
-  });
+  } catch (e) {
+    approvals.delete(id);
+    throw new Error('Could not open the EMCON consent window: ' + e.message);
+  }
+  const ok = await decision;
   approvals.delete(id);
   if (!ok) throw new Error('You declined the sign-in request.');
 
@@ -422,6 +428,13 @@ const HANDLERS = {
   'settings:set': async ({ patch }) => { const s = { ...(await settings()), ...patch }; await local.set('settings', s); return s; },
 };
 const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze']);
+
+// First install: show the welcome page once (unpacked reloads don't repeat it).
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  if (reason !== 'install' || (await local.get('welcomed'))) return;
+  await local.set('welcomed', true);
+  chrome.tabs.create({ url: chrome.runtime.getURL('pages/welcome.html') });
+});
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   const fromExtensionPage = sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
