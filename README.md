@@ -2,6 +2,8 @@
 
 **One browser extension + one tiny server that protect people from tracking, fake media, payment scams and phishing using cryptography and deterministic checks instead of probabilistic AI detectors.**
 
+**🌐 Live demo: https://emcon-e2tu.onrender.com** (free hosting, so the first visit after a quiet spell takes ~50 s to wake up)
+
 AI detectors fail in two directions: they flag real content, and attackers learn to slip past them. EMCON asks questions that have provable answers:
 
 | Shield | Instead of asking… | EMCON asks… | Built on |
@@ -17,7 +19,7 @@ AI detectors fail in two directions: they flag real content, and attackers learn
 
 EMCON is a browser extension for **Chrome, Edge and Brave** (version 137+).
 
-1. Download `emcon-extension-v1.0.0.zip` and unzip it. (Building it yourself: `npm run pack` writes it to `dist/`.)
+1. Download **[emcon-extension-v1.0.0.zip](https://github.com/iShowPP/36CRProjectEMCON/releases/latest/download/emcon-extension-v1.0.0.zip)** (already set to the live server) and unzip it. (Building it yourself: `npm run pack -- --server=<your server>` writes it to `dist/`.)
 2. Open `chrome://extensions` (`edge://extensions` in Edge) and turn on **Developer mode**.
 3. Click **Load unpacked** and choose the unzipped **`emcon-extension`** folder.
 4. A welcome page opens. Pin EMCON to the toolbar, enter your EMCON server address, and optionally set up Ghost.
