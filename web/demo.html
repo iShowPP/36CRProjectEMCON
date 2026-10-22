@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMCON Demo</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .hero { display: grid; grid-template-columns: 1.35fr 1fr; gap: 32px; align-items: center; margin: 12px 0 36px; }
+    .hero h1 { font-size: 50px; line-height: 1.05; margin-bottom: 14px; letter-spacing: -.025em; }
+    .hero .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .hero .cta .btn { min-height: 48px; padding: 12px 20px; font-size: 16px; }
+    ol.steps { margin: 8px 0 0; padding-left: 0; list-style: none; counter-reset: s; font-size: 15px; }
+    ol.steps li { counter-increment: s; position: relative; padding: 0 0 12px 38px; }
+    ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+    .section { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 40px 0 14px; }
+    .section h2 { font-size: 24px; margin: 0; }
+    .feature { display: flex; flex-direction: column; }
+    .feature .fh { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .feature .fi { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--primary-tint); color: var(--primary); flex: none; }
+    .feature h3 { font-size: 18px; margin: 0; }
+    .feature p { font-size: 15px; color: var(--text-2); margin: 0 0 14px; }
+    .feature .row { margin-top: auto; }
+    .fix { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-2); list-style: none; }
+    .fix li { margin: 5px 0; } .fix b { color: var(--text); }
+    .live { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; }
+    .live .big { font-size: 44px; font-weight: 750; line-height: 1; color: var(--bad); font-variant-numeric: tabular-nums; }
+    #feedSample { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    #feedSample div { padding: 3px 9px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
+    svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } .hero h1 { font-size: 36px; } .live { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="hero">
+      <div>
+        <div class="kicker">EMCON · browser extension for Chrome, Edge and Brave</div>
+        <h1>Scams explained before they cost you.</h1>
+        <p class="lead" style="margin-bottom:18px">EMCON checks the websites, links, photos and payments you come across, and shows you exactly why: signed reports, public registries and the trail that led you there. No AI guesses a scammer can learn to fool.</p>
+        <div class="cta"><a class="btn primary" href="/real.html">Try it on real websites</a><a class="btn" href="/sms.html">See a scam chain caught</a></div>
+      </div>
+      <div class="card">
+        <h3>Set up in two minutes</h3>
+        <ol class="steps">
+          <li>Open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b> and pick the <code>emcon-extension</code> folder.</li>
+          <li>On the welcome page, set the server to <code id="here"></code>.</li>
+          <li>Pin EMCON to the toolbar.</li>
+        </ol>
+        <div id="ext" class="small"></div>
+      </div>
+    </div>
+
+    <div class="card live">
+      <div class="big" id="feedCount">…</div>
+      <div>
+        <h3 style="margin-bottom:2px">live phishing sites EMCON blocks right now</h3>
+        <p class="small muted" style="margin:0">From the OpenPhish community feed, updated <span id="feedWhen">…</span>. A few of them (written with [.] so they can't be clicked):</p>
+        <div id="feedSample" class="mono"></div>
+        <p class="small bad" style="margin:0">These are real scam sites. Never type anything into one. <a href="/real.html">How to test them safely</a></p>
+      </div>
+    </div>
+
+    <div class="section"><h2>Catches scams</h2></div>
+    <div class="grid">
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4.5"/></svg></span><h3>Phishing and look-alike sites</h3></div>
+        <p>Blocks copies of real login pages, look-alike addresses (<code>paypa1-secure.com</code>), brand-new domains and sites in the live phishing feed or reported by people you trust.</p>
+        <div class="row"><a class="btn primary" data-alt="/phish-login.html" href="#">Fake bank login</a><a class="btn" href="/bank-login.html">Real bank login</a></div>
+        <ul class="fix"><li><b>Fake reviews:</b> only reports reachable from your own trust roots count, capped per branch.</li><li><b>Privacy:</b> lookups send a 5-character hash prefix, never the address.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9.5L5 19.5V16H4z"/></svg></span><h3>Scam chain detector</h3></div>
+        <p>Follows the path to a page: the message, the short link, the redirects, the fake site, the form. Prize or threat wording plus card or OTP fields becomes one explained warning.</p>
+        <div class="row"><a class="btn primary" href="/sms.html">Prize SMS demo</a></div>
+        <ul class="fix"><li><b>Never reads your messages:</b> you can paste one; it stays on your computer.</li><li><b>No false alarms on checkouts:</b> redirects plus card fields alone never trigger it.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span><h3>Honey-Vault payments</h3></div>
+        <p>Scam brakes inside the bank: a risk-scaled cooling-off, a scam-script check-in, family guardians who co-sign or veto, a duress PIN, and settings that only loosen slowly.</p>
+        <div class="row"><a class="btn primary" href="/vault.html">Kestrel Bank</a></div>
+        <ul class="fix"><li><b>Coached victims:</b> the delay grows with risk and red-flag answers go to guardians.</li><li><b>Thieves with your PIN:</b> loosening a protection takes 24 hours and alerts guardians.</li></ul>
+      </div>
+    </div>
+
+    <div class="section"><h2>Explains itself</h2></div>
+    <div class="grid">
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5"/><path d="M9 12.5h6M9 16.5h6"/></svg></span><h3>Evidence receipts</h3></div>
+        <p>Every check is shown as <i>Warning, OK, Couldn't check</i> or <i>Not needed</i>. Save a receipt signed with your EMCON key and timestamped by the server, which sees only a hash of it.</p>
+        <div class="row"><a class="btn primary" href="/verify.html">Verify a receipt</a></div>
+        <ul class="fix"><li><b>Honest limits:</b> a receipt proves what EMCON observed and when, not that a site is guilty.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></span><h3>Privacy promise monitor</h3></div>
+        <p>Names the companies tracking you on each page, sends "do not sell or share" (Global Privacy Control), and checks whether tracking stops after you say no.</p>
+        <div class="row"><a class="btn primary" href="/news.html">Newspaper demo</a></div>
+        <ul class="fix"><li><b>Observed, not inferred:</b> every claim lists the domains and features your browser actually saw.</li></ul>
+      </div>
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 15.5 15.5 11 6 19.5"/></svg></span><h3>Photo labels</h3></div>
+        <p>Asks "who published this, and has it changed?" instead of "is this AI?". Verified, altered, recovered after stripping, or unknown signer. Unsigned photos get no label.</p>
+        <div class="row"><a class="btn primary" href="/sign.html">Provenance studio</a><a class="btn" href="/feed.html">Feed</a></div>
+        <ul class="fix"><li><b>Stripped metadata:</b> a visual fingerprint finds the signed original, matched on your computer.</li></ul>
+      </div>
+    </div>
+
+    <div class="section"><h2>Protects your identity</h2></div>
+    <div class="grid">
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M6 20.5V11a6 6 0 0 1 12 0v9.5l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z"/><path d="M10 10.5v.5M14 10.5v.5"/></svg></span><h3>Ghost sign-in</h3></div>
+        <p>Sign up as a verified adult with no email, name or cross-site ID: blind-signed tokens and a different key on every site.</p>
+        <div class="row"><a class="btn primary" href="/rp.html">ShopNorth sign-in</a><a class="btn" data-alt="/rp.html" href="#">As a second company</a></div>
+      </div>
+      <div class="card feature">
+        <div class="fh"><span class="fi"><svg class="i" viewBox="0 0 24 24"><path d="M6.3 17.5A9 9 0 0 1 5 12.6a7 7 0 0 1 12.2-4.7"/><path d="M19 11.5c.1.7.1 1.4 0 2"/><path d="M9 19.6c1-1.9 1.5-4 1.5-6.4a1.5 1.5 0 0 1 3 0c0 .6 0 1.2-.1 1.8"/><path d="M8 12.6a4 4 0 0 1 8 0c0 2.6-.5 5-1.6 7.2"/></svg></span><h3>Anti-fingerprinting</h3></div>
+        <p>Fresh noise on every visit, applied before the page's first script, plus bucketed hardware values, so trackers can't follow your device and sites don't break.</p>
+        <div class="row"><a class="btn" href="https://browserleaks.com/canvas" target="_blank" rel="noopener">Test on browserleaks.com</a></div>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    import { $, $$, esc, api, ago, hubNav, hasExtension } from '/common.js';
+    hubNav('/demo.html');
+    setTimeout(() => {
+      $('#ext').innerHTML = hasExtension() ? '<span class="chip ok">EMCON is running on this page</span>' : '<span class="chip warn">Extension not detected on this page yet</span>';
+    }, 700);
+
+    const cfg = await api('/api/config');
+    $('#here').textContent = cfg.official;
+    for (const a of $$('[data-alt]')) {
+      if (cfg.alt) a.href = cfg.alt + a.dataset.alt;
+      else a.remove(); // a single public hostname can't play two different websites
+    }
+
+    const feed = await api('/api/wot/feed?limit=6').catch(() => null);
+    if (feed?.count) {
+      $('#feedCount').textContent = feed.count;
+      $('#feedWhen').textContent = feed.updated ? ago(Date.parse(feed.updated)) : 'recently';
+      $('#feedSample').innerHTML = feed.sample.map((h) => `<div>${esc(h.replace(/\./g, '[.]'))}</div>`).join('');
+    } else {
+      $('#feedCount').textContent = '0';
+      $('#feedWhen').textContent = feed?.enabled === false ? 'never (feed disabled on this server)' : 'not yet (feed loading)';
+    }
+  </script>
+</body>
+</html>

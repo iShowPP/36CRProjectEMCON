@@ -25,7 +25,7 @@ export async function api(path, { method = 'GET', body, headers = {} } = {}) {
 }
 
 export function hubNav(active) {
-  const links = [['/', 'Overview'], ['/real.html', 'Real internet'], ['/rp.html', 'Ghost sign-in'], ['/sign.html', 'Provenance'], ['/feed.html', 'Feed'], ['/vault.html', 'Vault'], ['/sms.html', 'Scam chain'], ['/news.html', 'Privacy'], ['/verify.html', 'Verify receipt']];
+  const links = [['/demo.html', 'Overview'], ['/real.html', 'Real internet'], ['/rp.html', 'Ghost sign-in'], ['/sign.html', 'Provenance'], ['/feed.html', 'Feed'], ['/vault.html', 'Vault'], ['/sms.html', 'Scam chain'], ['/news.html', 'Privacy'], ['/verify.html', 'Verify receipt']];
   const h = document.createElement('header');
   h.className = 'top';
   h.innerHTML = `<a class="brand" href="/">EMCON<small>demo</small></a><nav>${links.map(([href, t]) => `<a href="${href}" class="${href === active ? 'on' : ''}">${t}</a>`).join('')}</nav>`;

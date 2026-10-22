@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Terms · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 30px 20px 20px; }
+    .legal h1 { font-size: 40px; margin-bottom: 4px; }
+    .legal h2 { font-size: 21px; margin: 32px 0 8px; }
+    .legal p, .legal li { color: var(--text-2); font-size: 16px; }
+    .legal li { margin: 6px 0; }
+    .legal table { margin: 10px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <header class="site-top"><a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a><nav><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="/login">Log in</a><a class="btn primary" href="/signup">Get started free</a></nav></header>
+  <main class="legal">
+    <div class="eyebrow" style="font-size:14px;font-weight:700;color:var(--primary)">Last updated 23 October 2026</div>
+    <h1>Terms of service</h1>
+    <div class="notice warn" style="margin:16px 0 8px">Draft for the hackathon build. Have a lawyer review it before EMCON takes paying customers.</div>
+
+    <p class="lead" style="font-size:19px">The short version: use EMCON to protect yourself and people who agree to it. EMCON helps you spot scams, but it can't promise to catch every one.</p>
+    <h2>1. Using EMCON</h2>
+    <ul><li>You need to be 13 or older, or have a parent's permission.</li><li>Only connect a browser to your account if its user knows and agrees. Family protection is for people who want it, not for monitoring someone in secret.</li><li>Don't use the link-check API to scan sites you aren't allowed to, or to overload them.</li></ul>
+    <h2>2. What EMCON does and doesn't promise</h2>
+    <p>EMCON shows evidence: scam reports, look-alike addresses, redirects and more. A missing warning doesn't mean a site is safe, and a warning isn't a legal finding that a site is a scam. Always use your own judgement before sharing passwords, OTPs or money.</p>
+    <h2>3. Your account</h2>
+    <p>Keep your password and recovery key safe; we can't reset your account for you. You can delete your account at any time.</p>
+    <h2>4. Plans and billing</h2>
+    <p>The Free plan is free. Paid plans renew monthly or yearly and can be cancelled at any time, keeping access until the end of the period. During this hackathon build, paid plans run in demo mode and nothing is charged.</p>
+    <h2>5. API</h2>
+    <p>API keys are personal to your account. Keep them secret, respect the daily limits of your plan, and don't resell raw results as your own blocklist.</p>
+    <h2>6. Changes</h2>
+    <p>If these terms change in a way that matters, we'll tell you on the dashboard before the change takes effect.</p>
+    <h2>7. Law</h2>
+    <p>These terms are governed by the laws of India.</p>
+  </main>
+  <div id="foot"></div>
+  <script type="module">import { footer } from '/site.js'; document.querySelector('#foot').innerHTML = footer();</script>
+</body>
+</html>

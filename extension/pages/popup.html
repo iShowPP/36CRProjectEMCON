@@ -127,6 +127,18 @@
             <div class="setting"><div><b>Anti-fingerprinting</b><span>Invisible noise so sites can't recognise your device</span></div><input type="checkbox" class="switch" id="s_farble"></div>
             <div class="setting"><div><b>Pause fingerprint protection here</b><span id="exceptionSub">Only if this site misbehaves</span></div><input type="checkbox" class="switch" id="s_exception"></div>
           </div>
+          <div class="section-title">EMCON account</div>
+          <div class="card" id="acct">
+            <div id="acctOff">
+              <p class="small muted" style="margin-top:0">Connect this browser to your EMCON account (or a family member's) to see the scams it blocks on the dashboard. It shares weekly counts only, never the sites you visit.</p>
+              <label for="pairCode" style="margin-top:0">6-digit code from the dashboard</label>
+              <div class="row" style="flex-wrap:nowrap"><input id="pairCode" inputmode="numeric" maxlength="7" placeholder="123 456" class="mono" style="letter-spacing:.15em"><button id="pairGo" class="primary" style="flex:none">Connect</button></div>
+              <div id="pairMsg" class="small" style="margin-top:6px"></div>
+            </div>
+            <div id="acctOn" class="hidden">
+              <div class="row" style="flex-wrap:nowrap"><span class="dot-icon role-safe" style="width:36px;height:36px" data-icon="checkCircle"></span><div style="flex:1"><b id="acctName"></b><div class="small muted" id="acctSub"></div></div><button id="unpair" class="sm">Disconnect</button></div>
+            </div>
+          </div>
           <label for="s_server">EMCON server</label><input id="s_server" class="mono">
           <p class="tiny faint" style="margin-top:8px">Changes apply the next time a page loads.</p>
         </div>

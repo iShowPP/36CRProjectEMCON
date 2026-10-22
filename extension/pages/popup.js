@@ -215,5 +215,22 @@ $('#s_exception').onchange = async (e) => {
   await send({ type: 'settings:set', patch: { farbleExceptions: e.target.checked ? [...cur, url.hostname] : cur } });
   renderTiles();
 };
+// ---------- EMCON account ----------
+async function renderAccount(st) {
+  st ||= await send({ type: 'account:status' }).catch(() => ({ connected: false }));
+  $('#acctOff').classList.toggle('hidden', st.connected);
+  $('#acctOn').classList.toggle('hidden', !st.connected);
+  if (st.connected) {
+    $('#acctName').textContent = `Connected to ${st.account}'s account`;
+    $('#acctSub').textContent = `${st.owner === st.account ? 'Your browser' : `${st.owner}'s browser`} · ${st.name}`;
+  }
+}
+$('#pairGo').onclick = async () => {
+  $('#pairMsg').textContent = 'Connecting…';
+  try { await renderAccount(await send({ type: 'account:pair', code: $('#pairCode').value })); $('#pairMsg').textContent = ''; }
+  catch (e) { $('#pairMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+};
+$('#unpair').onclick = async () => renderAccount(await send({ type: 'account:unpair' }));
+renderAccount();
 $('#s_server').value = s.server;
 $('#s_server').onchange = (e) => send({ type: 'settings:set', patch: { server: e.target.value.replace(/\/+$/, '') } });

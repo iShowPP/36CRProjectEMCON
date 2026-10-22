@@ -418,6 +418,88 @@ await test('when hosted, link check refuses private-network targets (no SSRF)', 
 });
 side.close();
 
+console.log('\nSaaS accounts');
+// A tiny cookie jar per "browser", and the Origin header our own pages would send.
+async function acct(p, { method = 'GET', body, headers = {}, jar = me1 } = {}) {
+  const r = await fetch(BASE + p, { method, headers: { 'content-type': 'application/json', origin: BASE, ...(jar.c ? { cookie: jar.c } : {}), ...headers }, body: body && JSON.stringify(body) });
+  for (const c of r.headers.getSetCookie()) { const kv = c.split(';')[0]; jar.c = kv.endsWith('=') ? '' : kv; }
+  return { status: r.status, ...(await r.json().catch(() => ({}))) };
+}
+const me1 = { c: '' }, other = { c: '' };
+const EMAIL = 'priya@example.com', PW = 'correct horse battery';
+let recovery;
+await test('sign-up creates an account, a session cookie and a recovery key; weak passwords are refused', async () => {
+  assert.equal((await acct('/api/auth/signup', { method: 'POST', body: { email: EMAIL, password: 'short' } })).status, 400);
+  const r = await acct('/api/auth/signup', { method: 'POST', body: { email: EMAIL, password: PW, name: 'Priya' } });
+  assert.equal(r.status, 200, r.error);
+  assert.match(r.recoveryKey, /^[A-Z0-9]{5}(-[A-Z0-9]{5}){3}$/);
+  recovery = r.recoveryKey;
+  assert.match(me1.c, /^emcon_session=s_/);
+  const m = await acct('/api/me');
+  assert.equal(m.user.email, EMAIL);
+  assert.equal(m.user.plan.id, 'free');
+  assert.equal((await acct('/api/auth/signup', { method: 'POST', body: { email: EMAIL, password: PW }, jar: other })).status, 409);
+});
+await test('sign-in: wrong password refused, right one works, sign-out ends the session', async () => {
+  assert.equal((await acct('/api/auth/logout', { method: 'POST' })).status, 200);
+  assert.equal((await acct('/api/me')).status, 401);
+  assert.equal((await acct('/api/auth/login', { method: 'POST', body: { email: EMAIL, password: 'wrong password!!' } })).status, 401);
+  assert.equal((await acct('/api/auth/login', { method: 'POST', body: { email: EMAIL, password: PW } })).status, 200);
+  assert.equal((await acct('/api/me')).user.name, 'Priya');
+});
+await test('state-changing calls from another site are refused (CSRF)', async () => {
+  const r = await acct('/api/me/profile', { method: 'POST', body: { name: 'Hacked' }, headers: { origin: 'https://evil.example' } });
+  assert.equal(r.status, 403);
+  assert.equal((await acct('/api/me')).user.name, 'Priya');
+});
+await test('the recovery key resets the password, signs out elsewhere and is replaced', async () => {
+  await acct('/api/auth/login', { method: 'POST', body: { email: EMAIL, password: PW }, jar: other });
+  const r = await acct('/api/auth/recover', { method: 'POST', body: { email: EMAIL, recoveryKey: recovery, newPassword: 'a brand new passphrase' } });
+  assert.equal(r.status, 200, r.error);
+  assert.notEqual(r.recoveryKey, recovery);
+  assert.equal((await acct('/api/me', { jar: other })).status, 401, 'other sessions signed out');
+  assert.equal((await acct('/api/auth/recover', { method: 'POST', body: { email: EMAIL, recoveryKey: recovery, newPassword: 'another passphrase!' }, jar: other })).status, 401, 'old key no longer works');
+});
+await test('a family member\'s browser pairs with a code and reports counts; a new block becomes an alert', async () => {
+  const fam = await acct('/api/me/family', { method: 'POST', body: { name: 'Mum', relation: 'mother' } });
+  const { code } = await acct('/api/me/pair', { method: 'POST', body: { member: fam.member.id } });
+  assert.match(code, /^\d{6}$/);
+  const dev = await acct('/api/devices/pair', { method: 'POST', body: { code, name: 'Chrome on Windows' }, jar: { c: '' } });
+  assert.equal(dev.owner, 'Mum');
+  assert.equal((await acct('/api/devices/pair', { method: 'POST', body: { code }, jar: { c: '' } })).status, 400, 'codes are single-use');
+  await acct('/api/devices/report', { method: 'POST', body: { token: dev.deviceToken, stats: { pages: 40, blocked: 0 } }, jar: { c: '' } });
+  await acct('/api/devices/report', { method: 'POST', body: { token: dev.deviceToken, stats: { pages: 52, blocked: 1, url: 'https://secret.example' } }, jar: { c: '' } });
+  const m = await acct('/api/me');
+  assert.equal(m.devices.length, 1);
+  assert.equal(m.week.blocked, 1);
+  assert.match(m.alerts[0].text, /blocked a scam page on Mum's browser/);
+  assert.ok(!JSON.stringify(m).includes('secret.example'), 'no addresses are stored');
+});
+await test('API keys: shown once, check links with the evidence engine, count usage, and can be revoked', async () => {
+  const k = await acct('/api/me/keys', { method: 'POST', body: { name: 'Helpdesk' } });
+  assert.match(k.key, /^emk_live_/);
+  assert.ok(!JSON.stringify(await acct('/api/me')).includes(k.key), 'the full key is never shown again');
+  const call = (key) => fetch(BASE + '/api/v1/check', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key }, body: JSON.stringify({ text: 'URGENT: your account will be blocked. Verify now: https://live-scam-shop.test/login' }) });
+  const r = await (await call(k.key)).json();
+  assert.equal(r.result.verdict, 'scam');
+  assert.ok(r.result.reasons.some((x) => x.id === 'reports') && r.result.reasons.some((x) => x.id === 'wording'));
+  assert.equal(r.usage.today, 1);
+  await acct(`/api/me/keys/${k.id}/revoke`, { method: 'POST' });
+  assert.equal((await call(k.key)).status, 401);
+});
+await test('plans change with a recorded (demo) invoice; device limits apply', async () => {
+  const r = await acct('/api/me/plan', { method: 'POST', body: { plan: 'family' } });
+  assert.equal(r.user.plan.id, 'family');
+  const m = await acct('/api/me');
+  assert.equal(m.invoices[0].amount, 149);
+  assert.match(m.invoices[0].status, /demo/);
+});
+await test('deleting the account removes it, its browsers and its sign-in', async () => {
+  assert.equal((await acct('/api/me/delete', { method: 'POST', body: { confirm: 'nope', password: 'a brand new passphrase' } })).status, 400);
+  assert.equal((await acct('/api/me/delete', { method: 'POST', body: { confirm: 'DELETE', password: 'a brand new passphrase' } })).status, 200);
+  assert.equal((await acct('/api/auth/login', { method: 'POST', body: { email: EMAIL, password: 'a brand new passphrase' } })).status, 401);
+});
+
 server.close();
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}\n`);
 fs.rmSync(process.env.EMCON_DATA, { recursive: true, force: true });

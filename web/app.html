@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a>
+      <a class="nav" href="#overview" data-v="overview"><span data-i="home"></span>Overview</a>
+      <a class="nav" href="#devices" data-v="devices"><span data-i="devices"></span>Browsers &amp; family</a>
+      <a class="nav" href="#api" data-v="api"><span data-i="code"></span>Link-check API</a>
+      <a class="nav" href="#billing" data-v="billing"><span data-i="card"></span>Plan &amp; billing</a>
+      <a class="nav" href="#settings" data-v="settings"><span data-i="settings"></span>Settings</a>
+      <div class="plan" id="sidePlan"></div>
+    </aside>
+    <div class="app-main">
+      <div class="topbar"><h1 id="title">Overview</h1><div class="me"><span id="who"></span><span class="avatar" id="avatar"></span><button class="sm" id="logout" title="Sign out" style="min-height:34px;padding:6px 10px"><span data-i="logout"></span></button></div></div>
+      <main class="view" id="view"><p class="muted">Loading…</p></main>
+    </div>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

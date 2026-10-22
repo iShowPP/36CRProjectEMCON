@@ -58,37 +58,42 @@ export default async function link(route) {
     if (recent.length >= PER_MINUTE) throw new HttpError(429, 'too many link checks; try again in a minute');
     hits.set(client, [...recent, now]);
 
-    let u;
-    try { u = new URL(String(query.url || '')); } catch { throw new HttpError(400, 'not a valid link'); }
-    if (!/^https?:$/.test(u.protocol)) throw new HttpError(400, 'only http and https links can be checked');
-
-    const hops = [];
-    for (let i = 0; i < MAX_HOPS; i++) {
-      await assertPublic(u.hostname);
-      let res;
-      try {
-        res = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': 'Mozilla/5.0 (EMCON link check)', accept: 'text/html,*/*' } });
-      } catch {
-        hops.push({ url: u.href, error: 'unreachable' });
-        return { hops, final: u.href, complete: false };
-      }
-      const loc = res.headers.get('location');
-      if (res.status >= 300 && res.status < 400 && loc) {
-        res.body?.cancel().catch(() => {});
-        hops.push({ url: u.href, status: res.status, leaves: 'redirect' });
-        u = new URL(loc, u);
-        if (!/^https?:$/.test(u.protocol)) break;
-        continue;
-      }
-      const refresh = res.ok ? await metaRefresh(res) : (res.body?.cancel().catch(() => {}), null);
-      if (refresh) {
-        hops.push({ url: u.href, status: res.status, leaves: 'page redirect' });
-        u = new URL(refresh, u);
-        continue;
-      }
-      hops.push({ url: u.href, status: res.status });
-      return { hops, final: u.href, complete: true };
-    }
-    return { hops, final: u.href, complete: false };
+    return expandLink(query.url);
   });
+}
+
+/** Follow a link's redirects without a browser: { hops, final, complete }. */
+export async function expandLink(raw) {
+  let u;
+  try { u = new URL(String(raw || '')); } catch { throw new HttpError(400, 'not a valid link'); }
+  if (!/^https?:$/.test(u.protocol)) throw new HttpError(400, 'only http and https links can be checked');
+
+  const hops = [];
+  for (let i = 0; i < MAX_HOPS; i++) {
+    await assertPublic(u.hostname);
+    let res;
+    try {
+      res = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': 'Mozilla/5.0 (EMCON link check)', accept: 'text/html,*/*' } });
+    } catch {
+      hops.push({ url: u.href, error: 'unreachable' });
+      return { hops, final: u.href, complete: false };
+    }
+    const loc = res.headers.get('location');
+    if (res.status >= 300 && res.status < 400 && loc) {
+      res.body?.cancel().catch(() => {});
+      hops.push({ url: u.href, status: res.status, leaves: 'redirect' });
+      u = new URL(loc, u);
+      if (!/^https?:$/.test(u.protocol)) break;
+      continue;
+    }
+    const refresh = res.ok ? await metaRefresh(res) : (res.body?.cancel().catch(() => {}), null);
+    if (refresh) {
+      hops.push({ url: u.href, status: res.status, leaves: 'page redirect' });
+      u = new URL(refresh, u);
+      continue;
+    }
+    hops.push({ url: u.href, status: res.status });
+    return { hops, final: u.href, complete: true };
+  }
+  return { hops, final: u.href, complete: false };
 }

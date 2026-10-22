@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 30px 20px 20px; }
+    .legal h1 { font-size: 40px; margin-bottom: 4px; }
+    .legal h2 { font-size: 21px; margin: 32px 0 8px; }
+    .legal p, .legal li { color: var(--text-2); font-size: 16px; }
+    .legal li { margin: 6px 0; }
+    .legal table { margin: 10px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <header class="site-top"><a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a><nav><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="/login">Log in</a><a class="btn primary" href="/signup">Get started free</a></nav></header>
+  <main class="legal">
+    <div class="eyebrow" style="font-size:14px;font-weight:700;color:var(--primary)">Last updated 23 October 2026</div>
+    <h1>Privacy policy</h1>
+    <div class="notice warn" style="margin:16px 0 8px">Draft for the hackathon build. Have a lawyer review it before EMCON takes paying customers.</div>
+
+    <p class="lead" style="font-size:19px">EMCON is a privacy product, so this policy is short: we collect as little as possible, and most of EMCON never talks to us at all.</p>
+    <h2>What runs only on your computer</h2>
+    <ul><li>Anti-fingerprinting, photo labels, the privacy monitor and the scam-chain detector run inside your browser.</li><li>Messages you paste into EMCON stay on your computer. Only the link inside is sent to be followed.</li><li>Your EMCON signing keys never leave your browser.</li></ul>
+    <h2>What the EMCON server sees</h2>
+    <table><thead><tr><th>When</th><th>What we receive</th><th>What we keep</th></tr></thead><tbody>
+      <tr><td>Phishing lookups</td><td>The first 5 characters of a hash of the site's domain</td><td>Nothing</td></tr>
+      <tr><td>Checking a link</td><td>The link you asked to check</td><td>Nothing (rate-limit counters only)</td></tr>
+      <tr><td>Saving a receipt</td><td>A hash of the receipt, to timestamp it</td><td>Nothing</td></tr>
+      <tr><td>Your account</td><td>Name, email, password (hashed with scrypt)</td><td>Until you delete your account</td></tr>
+      <tr><td>Connected browsers</td><td>Weekly counts: pages checked, scams blocked, warnings</td><td>The latest week; never the sites visited</td></tr>
+      <tr><td>Sign-ins</td><td>Time, method and browser type</td><td>Your last 30 sign-ins, for your security</td></tr>
+    </tbody></table>
+    <h2>What we never do</h2>
+    <ul><li>Sell or share your data, or use it for advertising.</li><li>Read your messages, email or browsing history.</li><li>Show a family member which sites another family member visits.</li><li>Load third-party trackers or fonts on our pages.</li></ul>
+    <h2>Your rights</h2>
+    <p>You can download all your account data or delete your account at any time from <a href="/app#settings">Settings</a>. Deleting is immediate. Under India's Digital Personal Data Protection Act 2023 and the GDPR you can also ask us what we hold about you and have it corrected.</p>
+    <h2>Payments</h2>
+    <p>No payment provider is connected yet. When one is, card details will go to that provider directly and never touch EMCON's servers.</p>
+    <h2>Contact</h2>
+    <p>Questions or requests: open an issue at <a href="https://github.com/iShowPP/36CRProjectEMCON">github.com/iShowPP/36CRProjectEMCON</a>.</p>
+  </main>
+  <div id="foot"></div>
+  <script type="module">import { footer } from '/site.js'; document.querySelector('#foot').innerHTML = footer();</script>
+</body>
+</html>

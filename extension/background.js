@@ -8,7 +8,7 @@ import { dhash } from './lib/dhash.js';
 import { domTokens, simhash64 } from './lib/simhash.js';
 import { computeTrust, scoreDomain } from './lib/trustgraph.js';
 import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
-import { normDomain, isIp, isLocal, registrable } from './lib/domains.js';
+import { normDomain, isIp, isLocal, registrable, imitation } from './lib/domains.js';
 import { lureFindings, urlsIn, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
 import { receiptDigest } from './lib/receipt.js';
 import { initWatch, tabState, persist, recordPageFacts, chainReport, linkChainReport, privacyReport, markConsent, setGpc, watchHooks } from './watch.js';
@@ -51,6 +51,7 @@ function bumpStat(key, n = 1) {
     (s[day] ||= {})[key] = (s[day][key] || 0) + n;
     for (const d of Object.keys(s).sort().slice(0, -7)) delete s[d];
     await local.set('stats', s);
+    reportStats();
   }).catch(() => {});
 }
 async function weekStats() {
@@ -59,6 +60,29 @@ async function weekStats() {
   return t;
 }
 watchHooks({ onNewTracker: () => bumpStat('trackers') });
+
+// Optional EMCON account link: this browser reports its weekly counts (never addresses) to
+// the dashboard of the account it was paired with, at most every 15 minutes.
+let lastReport = 0;
+async function reportStats(force = false) {
+  const dev = await local.get('device');
+  if (!dev || (!force && Date.now() - lastReport < 15 * 60e3)) return;
+  lastReport = Date.now();
+  try { await api('/api/devices/report', { method: 'POST', body: { token: dev.token, stats: await weekStats(), version: VERSION } }); }
+  catch (e) { if (/no longer connected/.test(e.message)) await chrome.storage.local.remove('device'); }
+}
+async function accountPair({ code }) {
+  const ua = navigator.userAgent;
+  const name = `${/Edg\//.test(ua) ? 'Edge' : /Brave/.test(ua) || navigator.brave ? 'Brave' : 'Chrome'} on ${/Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : /Android/.test(ua) ? 'Android' : /Linux/.test(ua) ? 'Linux' : 'this computer'}`;
+  const r = await api('/api/devices/pair', { method: 'POST', body: { code: String(code || ''), name } });
+  await local.set('device', { token: r.deviceToken, account: r.account.name, owner: r.owner, name, at: Date.now() });
+  await reportStats(true);
+  return accountStatus();
+}
+async function accountStatus() {
+  const d = await local.get('device');
+  return d ? { connected: true, account: d.account, owner: d.owner, name: d.name } : { connected: false };
+}
 
 // One random master secret; every other key is derived from it with a label.
 let masterP;
@@ -386,39 +410,6 @@ async function domainAgeDays(host) {
 }
 
 const brandList = cached(10 * 60e3, () => api('/api/wot/brands'));
-
-// Undo the look-alike tricks phishers use in hostnames: digits for letters, "rn" for "m",
-// accented letters. (Non-Latin look-alikes arrive as punycode and are flagged separately.)
-const CONFUSABLE = { 0: 'o', 1: 'l', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b' };
-const skeleton = (s) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/[0-9]/g, (c) => CONFUSABLE[c] || c);
-
-function editDistance(a, b) {
-  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    let prev = row[0];
-    row[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const cur = row[j];
-      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = cur;
-    }
-  }
-  return row[b.length];
-}
-
-// Does this hostname borrow a brand's name? Whole hostname parts only, so "applebees" is not "apple".
-function imitation(domain, brand) {
-  const labels = domain.split('.').slice(0, -1); // the TLD can't imitate anything
-  for (const part of labels.flatMap((l) => l.split('-')).filter(Boolean)) {
-    const sk = skeleton(part);
-    for (const t of brand.tokens || []) {
-      if (part === t) return { strong: false, text: `uses the name "${t}"` };
-      if (sk === t) return { strong: true, text: `spells "${t}" with look-alike characters ("${part}")` };
-      if (t.length >= 6 && editDistance(sk, t) === 1) return { strong: true, text: `is one letter away from "${t}" ("${part}")` };
-    }
-  }
-  return null;
-}
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const list = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -781,6 +772,9 @@ const HANDLERS = {
   'wot:tab': async ({ tabId }) => (await chrome.storage.session.get('verdict_' + tabId))['verdict_' + tabId] || null,
   'prov:tab': async ({ tabId }) => { const tab = await chrome.tabs.get(tabId).catch(() => null); const t = tabImages.get(tabId); return t && tab?.url === t.url ? t.counts : {}; },
   'stats:week': weekStats,
+  'account:status': accountStatus,
+  'account:pair': accountPair,
+  'account:unpair': async () => { await chrome.storage.local.remove('device'); return { connected: false }; },
   'wot:me': async () => ({ did: (await wotIdentity()).did, roots: (await wotState()).roots }),
   'wot:attest': wotAttest,
   'wot:trust': wotTrust,

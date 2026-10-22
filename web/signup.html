@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Your Account · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-art">
+      <canvas id="scene" aria-hidden="true"></canvas>
+      <a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a>
+      <div class="quote"><b>Protect your whole family from one place.</b><span>Connect your parents' and kids' browsers and see every scam EMCON blocks for them, never the sites they visit.</span></div>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card" id="step1">
+        <h1>Create your account</h1>
+        <p class="sub">Free for you on 2 browsers. No card needed.</p>
+        <form id="form" novalidate>
+          <div class="field"><label for="name">Your name</label><input id="name" autocomplete="name" placeholder="e.g. Priya"></div>
+          <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="password">Password</label>
+            <div class="pw-wrap"><input id="password" type="password" autocomplete="new-password" required><button type="button" id="show">Show</button></div>
+            <div class="meter"><i id="bar"></i></div><div class="hint" id="pwHint">At least 10 characters. A short sentence works well.</div></div>
+          <label class="check" style="margin:4px 0 16px;font-weight:400"><input type="checkbox" id="agree"><span>I agree to the <a href="/terms" target="_blank">terms</a> and <a href="/privacy" target="_blank">privacy policy</a>.</span></label>
+          <button class="primary btn-block" id="go" type="submit">Create account</button>
+        </form>
+        <div class="or">or</div>
+        <button class="btn-ghost-signin" id="ghostBtn" type="button"><span id="ghostIcon"></span>Sign up with EMCON Ghost</button>
+        <p class="small muted" style="margin:8px 0 0;text-align:center">No email or password: proves you're a real person, nothing else.</p>
+        <div class="form-msg" id="msg" role="alert"></div>
+        <div class="auth-links"><span>Already have an account? <a href="/login">Sign in</a></span></div>
+      </div>
+
+      <div class="auth-card hidden" id="step2">
+        <h1>Save your recovery key</h1>
+        <p class="sub">If you forget your password, this key is the only way back in. EMCON can't reset it for you, so nobody can trick us into handing over your account.</p>
+        <div class="keybox" id="key"></div>
+        <div class="row"><button id="copy">Copy</button><button id="dl">Download as a file</button></div>
+        <label class="check" style="margin:18px 0;font-weight:400"><input type="checkbox" id="saved"><span>I've saved my recovery key somewhere safe.</span></label>
+        <button class="primary btn-block" id="cont" disabled>Continue to my dashboard</button>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { $, api, icon, ghostSignIn, strength, toast } from '/site.js';
+    import { mountScene } from '/scene3d.js';
+    mountScene($('#scene'), { compact: true, onDark: true });
+    $('#ghostIcon').outerHTML = icon('ghost');
+    const msg = (t, ok) => { $('#msg').textContent = t; $('#msg').className = 'form-msg ' + (ok ? 'ok' : 'bad'); };
+    $('#show').onclick = () => { const p = $('#password'); p.type = p.type === 'password' ? 'text' : 'password'; $('#show').textContent = p.type === 'password' ? 'Show' : 'Hide'; };
+    $('#password').oninput = () => {
+      const s = strength($('#password').value);
+      $('#bar').style.width = `${Math.max(8, s.score * 25)}%`;
+      $('#bar').style.background = s.color;
+      $('#pwHint').textContent = $('#password').value ? `${s.text}${$('#password').value.length < 10 ? ': use at least 10 characters' : ''}` : 'At least 10 characters. A short sentence works well.';
+    };
+    $('#form').onsubmit = async (e) => {
+      e.preventDefault();
+      if (!$('#agree').checked) return msg('Please agree to the terms to continue.');
+      $('#go').disabled = true; $('#go').textContent = 'Creating your account…';
+      try {
+        const r = await api('/api/auth/signup', { method: 'POST', body: { name: $('#name').value, email: $('#email').value, password: $('#password').value } });
+        const plan = new URLSearchParams(location.search).get('plan');
+        if (plan === 'family' || plan === 'business') await api('/api/me/plan', { method: 'POST', body: { plan } }).catch(() => {});
+        $('#key').textContent = r.recoveryKey;
+        $('#step1').classList.add('hidden'); $('#step2').classList.remove('hidden');
+      } catch (err) { msg(err.message); $('#go').disabled = false; $('#go').textContent = 'Create account'; }
+    };
+    $('#copy').onclick = async () => { await navigator.clipboard.writeText($('#key').textContent); toast('Recovery key copied'); };
+    $('#dl').onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([`EMCON recovery key for ${$('#email').value}\n\n${$('#key').textContent}\n\nKeep this safe. You need it to reset your password at ${location.origin}/recover\n`], { type: 'text/plain' }));
+      a.download = 'emcon-recovery-key.txt'; a.click();
+    };
+    $('#saved').onchange = () => { $('#cont').disabled = !$('#saved').checked; };
+    $('#cont').onclick = () => { location.href = '/app'; };
+    $('#ghostBtn').onclick = async () => {
+      $('#ghostBtn').disabled = true;
+      msg('Approve the sign-up in the EMCON window…', true);
+      try { await ghostSignIn(); location.href = '/app'; } catch (err) { msg(err.message); } finally { $('#ghostBtn').disabled = false; }
+    };
+  </script>
+</body>
+</html>

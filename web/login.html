@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign In · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-art">
+      <canvas id="scene" aria-hidden="true"></canvas>
+      <a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a>
+      <div class="quote"><b>Every warning comes with its proof.</b><span>Fake sites, scam messages, edited photos and hidden trackers, explained in plain words.</span></div>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Welcome back</h1>
+        <p class="sub">Sign in to see your browsers, family and API keys.</p>
+        <form id="form" novalidate>
+          <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="password">Password</label>
+            <div class="pw-wrap"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="show">Show</button></div></div>
+          <button class="primary btn-block" id="go" type="submit">Sign in</button>
+        </form>
+        <div class="or">or</div>
+        <button class="btn-ghost-signin" id="ghostBtn" type="button"><span id="ghostIcon"></span>Continue with EMCON Ghost</button>
+        <p class="small muted" style="margin:8px 0 0;text-align:center">Private sign-in from the EMCON extension: no email, no password.</p>
+        <div class="form-msg" id="msg" role="alert"></div>
+        <div class="auth-links"><a href="/recover">Forgot your password?</a><span>New here? <a href="/signup">Create an account</a></span></div>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { $, api, icon, ghostSignIn } from '/site.js';
+    import { mountScene } from '/scene3d.js';
+    mountScene($('#scene'), { compact: true, onDark: true });
+    $('#ghostIcon').outerHTML = icon('ghost');
+    const next = new URLSearchParams(location.search).get('next');
+    const go = () => { location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/app'; };
+    api('/api/me').then(go).catch(() => {}); // already signed in
+    const msg = (t, ok) => { $('#msg').textContent = t; $('#msg').className = 'form-msg ' + (ok ? 'ok' : 'bad'); };
+    $('#show').onclick = () => { const p = $('#password'); p.type = p.type === 'password' ? 'text' : 'password'; $('#show').textContent = p.type === 'password' ? 'Show' : 'Hide'; };
+    $('#form').onsubmit = async (e) => {
+      e.preventDefault();
+      if (!$('#email').value || !$('#password').value) return msg('Enter your email and password.');
+      $('#go').disabled = true; $('#go').textContent = 'Signing in…';
+      try { await api('/api/auth/login', { method: 'POST', body: { email: $('#email').value, password: $('#password').value } }); go(); }
+      catch (err) { msg(err.message); $('#go').disabled = false; $('#go').textContent = 'Sign in'; }
+    };
+    $('#ghostBtn').onclick = async () => {
+      $('#ghostBtn').disabled = true;
+      msg('Approve the sign-in in the EMCON window…', true);
+      try { await ghostSignIn(); go(); } catch (err) { msg(err.message); } finally { $('#ghostBtn').disabled = false; }
+    };
+  </script>
+</body>
+</html>

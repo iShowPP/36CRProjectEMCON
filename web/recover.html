@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset Your Password · EMCON</title>
+  <link rel="icon" href="/emcon-mark.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-art">
+      <canvas id="scene" aria-hidden="true"></canvas>
+      <a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a>
+      <div class="quote"><b>Only you can recover your account.</b><span>No support agent can be talked into resetting it. That's the point.</span></div>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card" id="step1">
+        <h1>Reset your password</h1>
+        <p class="sub">Use the recovery key you saved when you created your account.</p>
+        <form id="form" novalidate>
+          <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username"></div>
+          <div class="field"><label for="rk">Recovery key</label><input id="rk" class="mono" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"><div class="hint">At least 10 characters.</div></div>
+          <button class="primary btn-block" id="go" type="submit">Reset password</button>
+        </form>
+        <div class="form-msg" id="msg" role="alert"></div>
+        <div class="auth-links"><a href="/login">Back to sign in</a></div>
+      </div>
+      <div class="auth-card hidden" id="step2">
+        <h1>Password reset</h1>
+        <p class="sub">You're signed in, and signed out everywhere else. Your old recovery key no longer works. Here is your new one:</p>
+        <div class="keybox" id="key"></div>
+        <label class="check" style="margin:18px 0;font-weight:400"><input type="checkbox" id="saved"><span>I've saved my new recovery key.</span></label>
+        <button class="primary btn-block" id="cont" disabled>Continue to my dashboard</button>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { $, api } from '/site.js';
+    import { mountScene } from '/scene3d.js';
+    mountScene($('#scene'), { compact: true, onDark: true });
+    $('#form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('#go').disabled = true;
+      try {
+        const r = await api('/api/auth/recover', { method: 'POST', body: { email: $('#email').value, recoveryKey: $('#rk').value, newPassword: $('#password').value } });
+        $('#key').textContent = r.recoveryKey;
+        $('#step1').classList.add('hidden'); $('#step2').classList.remove('hidden');
+      } catch (err) { $('#msg').textContent = err.message; $('#msg').className = 'form-msg bad'; $('#go').disabled = false; }
+    };
+    $('#saved').onchange = () => { $('#cont').disabled = !$('#saved').checked; };
+    $('#cont').onclick = () => { location.href = '/app'; };
+  </script>
+</body>
+</html>

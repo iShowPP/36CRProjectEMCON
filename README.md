@@ -99,12 +99,29 @@ This starts the server on `:8787` and opens a browser window with the EMCON exte
 ### Tests
 
 ```bash
-npm test               # 44 API tests against the live server
+npm test               # 52 API tests against the live server
 npm run test:browser   # 25 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts
 npm run test:all       # both
 ```
 
 Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
+
+## The product site (SaaS)
+
+`/` is now a product landing page with a hand-drawn 3D scene (canvas, no library): scam links bounce off the EMCON shield, safe ones pass. The old demo hub moved to [/demo.html](/demo.html).
+
+| Page | What it does |
+|---|---|
+| `/signup`, `/login` | Email + password (scrypt) or **Continue with EMCON Ghost** (no email at all). Signup shows a **recovery key**: no email resets, so nobody can talk support into handing over an account. |
+| `/recover` | Reset the password with the recovery key; signs out every other session and issues a new key. |
+| `/app` | Dashboard: weekly protection across your browsers, alerts, a message/link checker, **Browsers & family** (6-digit pairing codes typed into the extension), **Link-check API** keys, **Plan & billing**, settings (password, recovery key, sign-out everywhere, data export, account deletion). |
+| `/privacy`, `/terms` | Drafts for the hackathon build. |
+
+Connected browsers report **weekly counts only** (pages checked, scams blocked…), never addresses; a family member's new block shows up as an alert. Sessions are HttpOnly SameSite cookies, every write must come from our own origin, sign-in is rate-limited, and session tokens, API keys and recovery keys are stored only as hashes.
+
+**API:** `POST /api/v1/check` with `Authorization: Bearer emk_live_…` and `{"text": "<message or link>"}` returns `verdict` (scam / suspicious / no_warnings), `risk`, `final`, `hops` and `reasons`. Daily limits by plan: Free 50, Family 500, Business 20,000.
+
+**Billing is a demo.** Plans (Free ₹0, Family ₹149/month, Business ₹2,999/month) switch instantly and record a "demo (no charge)" invoice. Taking real payments needs a Razorpay or Stripe account in the owner's name.
 
 ## Design
 
@@ -236,7 +253,7 @@ server/  (Node 22+, zero dependencies)
 web/        demo pages (overview, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone,
             prize SMS + claim page, newspaper, receipt verifier, real-internet guide)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (44 API tests) · extension.mjs (25 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
+test/       e2e.mjs (52 API tests) · extension.mjs (25 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
 scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)
