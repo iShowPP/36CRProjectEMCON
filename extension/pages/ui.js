@@ -51,7 +51,7 @@ export function verdictHtml(v, { where, pathTitle = 'How you got here', open = f
   return `
     <div class="panel role-${L.role}">
       <div class="hero"><span class="dot-icon">${icon(L.icon, 26)}</span><div><h1>${esc(L.head)}</h1><div class="where">${where || `on <b>${esc(v.domain)}</b>`}</div></div></div>
-      <p class="advice">${esc(L.advice)}</p>
+      <p class="advice">${esc(rows.some((c) => c.id === 'scripts' && c.status === 'found') && v.level !== 'danger' ? "Don't type card details here until you know why this payment page changed." : L.advice)}</p>
       ${reasons.length ? `<ul class="reasons">${reasons.map((c) => `<li class="role-${(STATUS[c.status] || STATUS.note).role}">${icon((STATUS[c.status] || STATUS.note).icon, 16)}<div><b>${esc(c.label)}.</b> ${esc(c.detail)}</div></li>`).join('')}</ul>`
         : `<ul class="reasons"><li class="role-ok">${icon('check', 16)}<div>${quiet} checks found nothing wrong.</div></li></ul>`}
     </div>

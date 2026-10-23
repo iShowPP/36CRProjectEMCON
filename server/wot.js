@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, save, HttpError, ROOT } from './store.js';
 import { ed25519Jwk } from './keys.js';
-import { OFFICIAL_HOST, ALT_HOST } from './config.js';
+import { OFFICIAL_HOST, ALT_HOST, DEMO } from './config.js';
 import { REAL_BRANDS, SHARED_HOSTS } from './brands.js';
 import { verifyCredential, signCredential, VC_CONTEXT } from '../extension/lib/vc.js';
 import { toHex, sha256, fromB64u, ed25519FromSeed, didKeyFromPub, pubFromDidKey } from '../extension/lib/util.js';
@@ -41,26 +41,28 @@ async function identity(keyName, label, name, description) {
 
 export default async function wot(route) {
   db.wot ||= { attestations: [], vouches: [] };
-  group = await identity('groupKey', 'wot/secops', 'EMCON SecOps Collective (demo)', 'Volunteer analysts who triage reported scams and phishing kits.');
+  group = await identity('groupKey', 'wot/secops', DEMO ? 'EMCON SecOps Collective (demo)' : 'EMCON Security Team', 'Scam and phishing reports reviewed by the EMCON team.');
   feed = await identity('feedKey', 'wot/openphish', 'OpenPhish live feed (via EMCON)', 'Phishing sites currently listed in the OpenPhish community feed (openphish.com), refreshed every 6 hours.');
   save();
 
   // Demo reports: added if missing, so a hosted deployment gets reports for its own hostnames.
-  const seed = [
+  const seed = !DEMO ? [] : [
     ALT_HOST && { domain: ALT_HOST, verdict: 'scam', transacted: false, note: 'Clone of the Kestrel Bank login page harvesting passwords' },
     { domain: 'cryptoyield-pro.xyz', verdict: 'scam', transacted: false, note: 'Pig-butchering "investment platform"; victims cannot withdraw' },
     { domain: OFFICIAL_HOST, verdict: 'trusted', transacted: true, note: 'Official Kestrel Bank (demo)' },
   ].filter(Boolean);
+  // older deployments stored the demo reports: never keep made-up data in the real product
+  if (!DEMO) db.wot.attestations = db.wot.attestations.filter((a) => !(a.issuer === group.did && /Kestrel|Pig-butchering/.test(a.note || '')));
   for (const s of seed) {
     if (!db.wot.attestations.some((a) => a.issuer === group.did && a.domain === s.domain)) await store(await attestationFor(s, group));
   }
 
   // Brands: the demo bank (with a structural fingerprint of its real login page) + real brands.
-  const official = fs.readFileSync(path.join(ROOT, 'web', 'bank-login.html'), 'utf8');
+  const official = DEMO ? fs.readFileSync(path.join(ROOT, 'test', 'site', 'bank-login.html'), 'utf8') : '';
   brands = [
-    { name: 'Kestrel Bank', domains: [OFFICIAL_HOST, 'kestrel-bank.example'], keywords: ['kestrel bank', 'kestrel'], tokens: [], simhash: simhash64(domTokens(official)) },
+    ...(!DEMO ? [] : [{ name: 'Kestrel Bank', domains: [OFFICIAL_HOST, 'kestrel-bank.example'], keywords: ['kestrel bank', 'kestrel'], tokens: [], simhash: simhash64(domTokens(official)) },
     // fictional shop impersonated by the scam-chain demo (never a real brand on a public page)
-    { name: 'QuickKart', domains: ['quickkart.example'], keywords: ['quickkart'], tokens: ['quickkart'], simhash: null },
+    { name: 'QuickKart', domains: ['quickkart.example'], keywords: ['quickkart'], tokens: ['quickkart'], simhash: null }]),
     ...REAL_BRANDS.map((b) => ({ ...b, keywords: b.tokens, simhash: null })),
   ];
 

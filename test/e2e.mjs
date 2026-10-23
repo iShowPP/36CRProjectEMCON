@@ -8,12 +8,14 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 process.env.EMCON_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'emcon-test-'));
+process.env.EMCON_DEMO_SITE = '1'; // the made-up test site in test/site (never served in production)
 process.env.EMCON_SECRET = 'e2e-test-secret';
 // Inline stand-in for the OpenPhish feed: two attacker hosts, plus a shared host and an
 // official brand host that must NOT be marked as scams.
 const FEED_LINES = ['https://live-scam-shop.test/login', 'http://www.paypa1-verify.top/secure', 'https://sites.google.com/view/fake-bank', 'https://accounts.google.com/x', 'not a url'];
 process.env.EMCON_FEED_URL = 'data:text/plain,' + encodeURIComponent(FEED_LINES.join('\n'));
 const { createApp } = await import('../server/app.js');
+const { flush } = await import('../server/store.js');
 const { toHex, fromHex, toB64, toB64u, randomBytes, ed25519FromSeed, ed25519Sign, didKeyFromPub, concat, hamming } = await import('../extension/lib/util.js');
 const brsa = await import('../extension/lib/blindrsa.js');
 const prov = await import('../extension/lib/provenance.js');
@@ -299,7 +301,7 @@ await test('Sybil swarm outside your web is ignored; one compromised friend is c
   assert.ok(s.pos <= 1.0001, `branch capped at 1, got ${s.pos}`);
 });
 await test('phishing clone is structurally close to the real login page; unrelated pages are not', () => {
-  const read = (f) => fs.readFileSync(new URL(`../web/${f}`, import.meta.url), 'utf8');
+  const read = (f) => fs.readFileSync(new URL(`./site/${f}`, import.meta.url), 'utf8');
   const h = (f) => simhash64(domTokens(read(f)));
   const clone = hamming(h('bank-login.html'), h('phish-login.html'));
   const other = Math.min(hamming(h('bank-login.html'), h('rp.html')), hamming(h('bank-login.html'), h('vault.html')));
@@ -518,11 +520,12 @@ await test('the recovery key resets the password, signs out elsewhere and is rep
   assert.equal((await acct('/api/me', { jar: other })).status, 401, 'other sessions signed out');
   assert.equal((await acct('/api/auth/recover', { method: 'POST', body: { email: EMAIL, recoveryKey: recovery, newPassword: 'another passphrase!' }, jar: other })).status, 401, 'old key no longer works');
 });
+let dev;
 await test('a family member\'s browser pairs with a code and reports counts; a new block becomes an alert', async () => {
   const fam = await acct('/api/me/family', { method: 'POST', body: { name: 'Mum', relation: 'mother' } });
   const { code } = await acct('/api/me/pair', { method: 'POST', body: { member: fam.member.id } });
   assert.match(code, /^\d{6}$/);
-  const dev = await acct('/api/devices/pair', { method: 'POST', body: { code, name: 'Chrome on Windows' }, jar: { c: '' } });
+  dev = await acct('/api/devices/pair', { method: 'POST', body: { code, name: 'Chrome on Windows' }, jar: { c: '' } });
   assert.equal(dev.owner, 'Mum');
   assert.equal((await acct('/api/devices/pair', { method: 'POST', body: { code }, jar: { c: '' } })).status, 400, 'codes are single-use');
   await acct('/api/devices/report', { method: 'POST', body: { token: dev.deviceToken, stats: { pages: 40, blocked: 0 } }, jar: { c: '' } });
@@ -532,6 +535,50 @@ await test('a family member\'s browser pairs with a code and reports counts; a n
   assert.equal(m.week.blocked, 1);
   assert.match(m.alerts[0].text, /blocked a scam page on Mum's browser/);
   assert.ok(!JSON.stringify(m).includes('secret.example'), 'no addresses are stored');
+});
+await test('payment brake: family member asks account owner to review a risky payment', async () => {
+  const req = await acct('/api/devices/approval', { method: 'POST', body: { token: dev.deviceToken, domain: 'suspicious-shop.example', reasons: ['Look-alike domain', 'Asks for card details'] }, jar: { c: '' } });
+  assert.ok(req.id);
+  assert.equal(req.account, 'Priya');
+  const m = await acct('/api/me');
+  assert.equal(m.approvals[0].id, req.id);
+  assert.equal(m.approvals[0].status, 'pending');
+  assert.equal(m.approvals[0].domain, 'suspicious-shop.example');
+  assert.match(m.alerts[0].text, /Mum asked you to check a payment on suspicious-shop.example/);
+
+  // Polling by device
+  const poll1 = await (await fetch(BASE + `/api/devices/approval/${req.id}`, { headers: { 'x-device-token': dev.deviceToken } })).json();
+  assert.equal(poll1.status, 'pending');
+
+  // Owner approves it
+  const decision = await acct(`/api/me/approvals/${req.id}`, { method: 'POST', body: { decision: 'approve', note: 'Checked with Mum' } });
+  assert.equal(decision.status, 'approved');
+
+  // Polling returns approval
+  const poll2 = await (await fetch(BASE + `/api/devices/approval/${req.id}`, { headers: { 'x-device-token': dev.deviceToken } })).json();
+  assert.equal(poll2.status, 'approved');
+  assert.equal(poll2.note, 'Checked with Mum');
+});
+await test('publishers: register domain and sign photos with embedded provenance', async () => {
+  const pub = await acct('/api/me/publisher', { method: 'POST', body: { domain: 'news.example.com' } });
+  assert.equal(pub.publisher.domain, 'news.example.com');
+  assert.match(pub.publisher.token, /^emcon-publisher=/);
+  assert.equal(pub.publisher.verified, false);
+
+  const png1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const signed = await acct('/api/me/sign', { method: 'POST', body: { image: png1x1, title: 'Press Release' } });
+  assert.ok(signed.image);
+  assert.equal(signed.manifest.title, 'Press Release');
+  assert.equal(signed.manifest.type, 'emcon.provenance');
+  assert.equal(signed.verified, false);
+});
+await test('persistence: state flushes cleanly to storage', async () => {
+  await flush();
+  const file = path.join(process.env.EMCON_DATA, 'db.json');
+  assert.ok(fs.existsSync(file), 'db.json exists on disk');
+  const stored = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.ok(stored.accounts?.users, 'users persisted');
+  assert.ok(stored.accounts?.byEmail[EMAIL], 'email index persisted');
 });
 await test('API keys: shown once, check links with the evidence engine, count usage, and can be revoked', async () => {
   const k = await acct('/api/me/keys', { method: 'POST', body: { name: 'Helpdesk' } });

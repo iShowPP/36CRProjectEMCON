@@ -26,6 +26,7 @@ export const ICON = {
   logout: '<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h11"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 15.5 15.5 11 6 19.5"/>',
 };
 export const icon = (n, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ''}</svg>`;
 
@@ -80,6 +81,6 @@ export function strength(pw) {
 export const footer = () => `<footer class="site-foot"><div class="in">
   <div><a class="brand" href="/" style="display:flex;align-items:center;gap:8px;font-weight:750;color:var(--text);font-size:17px"><img src="/emcon-mark.svg" alt="" width="24" height="24">EMCON</a><p style="margin:8px 0 0">Scams explained before they cost you. Evidence, not AI guesses.</p></div>
   <div><h4>Product</h4><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="/real.html">See it live</a><a href="https://github.com/iShowPP/36CRProjectEMCON/releases/latest">Download</a></div>
-  <div><h4>Developers</h4><a href="/app#api">Link-check API</a><a href="/demo.html">All demos</a><a href="https://github.com/iShowPP/36CRProjectEMCON">Source code</a></div>
+  <div><h4>Developers</h4><a href="/app#api">Link-check API</a><a href="https://github.com/iShowPP/36CRProjectEMCON">Source code</a></div>
   <div><h4>Legal</h4><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/verify.html">Verify a receipt</a></div>
 </div></footer>`;

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopNorth Checkout</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .shop { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+    .logo { font-weight: 800; font-size: 22px; letter-spacing: -.02em; color: #0f766e; }
+    .pay label { margin-top: 12px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 12px; }
+    .item { display: flex; justify-content: space-between; padding: 6px 0; color: var(--text-2); }
+    .demo-note { max-width: 980px; margin: 0 auto 0; padding: 0 16px; }
+    @media (max-width: 760px) { .shop { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="demo-note" style="padding-top:16px"><div class="notice small"><b>EMCON demo.</b> ShopNorth is fictional and nothing you type is sent anywhere. Open this page once normally, then again with <a href="?compromised=1">?compromised=1</a>: a script from another domain is injected after the page loads, the way a "Magecart" card skimmer arrives.</div></div>
+  <main class="shop">
+    <section class="card pay">
+      <div class="logo">ShopNorth</div>
+      <h1 style="font-size:26px;margin:8px 0 2px">Checkout</h1>
+      <p class="muted small" style="margin:0">Pay securely with your card.</p>
+      <form id="pay" autocomplete="on" onsubmit="event.preventDefault(); document.querySelector('#done').classList.remove('hidden')">
+        <label for="cc-name">Name on card</label><input id="cc-name" name="ccname" autocomplete="cc-name">
+        <label for="cc-number">Card number</label><input id="cc-number" name="cardnumber" autocomplete="cc-number" inputmode="numeric" placeholder="1234 5678 9012 3456">
+        <div class="two">
+          <div><label for="cc-exp">Expiry (MM/YY)</label><input id="cc-exp" name="exp-date" autocomplete="cc-exp" placeholder="MM/YY"></div>
+          <div><label for="cc-csc">CVV</label><input id="cc-csc" name="cvv" autocomplete="cc-csc" inputmode="numeric" placeholder="123"></div>
+        </div>
+        <button class="primary" style="width:100%;margin-top:16px;min-height:48px">Pay ₹2,499</button>
+        <p id="done" class="hidden small ok" style="margin-top:10px">Demo only: no payment was made and nothing was sent.</p>
+      </form>
+    </section>
+    <aside class="card">
+      <h3 style="margin-top:0">Order summary</h3>
+      <div class="item"><span>Wireless earbuds</span><span>₹2,299</span></div>
+      <div class="item"><span>Delivery</span><span>₹200</span></div>
+      <div class="total"><span>Total</span><span>₹2,499</span></div>
+    </aside>
+  </main>
+  <script src="/checkout-app.js"></script>
+  <script type="module">
+    if (new URLSearchParams(location.search).has('compromised')) {
+      // A compromised dependency adds one more script after load. Here it comes from the
+      // "second company" host when there is one (local demo), otherwise as an inline data: script.
+      const cfg = await fetch('/api/config').then((r) => r.json()).catch(() => ({}));
+      setTimeout(() => {
+        const s = document.createElement('script');
+        s.src = cfg.alt ? `${cfg.alt}/demo-cdn/analytics-helper.js` : 'data:text/javascript,console.info("EMCON demo: an injected script ran on the checkout")';
+        document.head.append(s);
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

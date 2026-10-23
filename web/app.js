@@ -40,7 +40,14 @@ const VIEWS = {
       [S.family.length > 0, 'Add someone you want to protect', '#devices', 'Add'],
       [u.recoverySet || u.signIn.ghost, 'Save your recovery key', '#settings', 'Open'],
     ];
+    const pending = (S.approvals || []).filter((a) => a.status === 'pending');
     return `
+      ${pending.length ? `<div class="panel-h" style="margin-top:0"><h2>Waiting for you</h2><span class="small muted">EMCON paused a payment until you check it</span></div>
+      <div class="list" style="margin-bottom:22px;border-color:var(--warn-line)">${pending.map((a) => `<div class="li" style="align-items:flex-start">
+        <span class="ico" style="background:var(--warn-tint);color:var(--warn)">${icon('card')}</span>
+        <div class="txt"><b>${esc(a.owner)} wants to pay on <span class="mono">${esc(a.domain)}</span></b><span>${esc(a.deviceName)} · ${ago(a.at)}</span>
+          ${a.reasons.length ? `<ul style="margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--text-2)">${a.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}</div>
+        <div class="row" style="flex-wrap:nowrap"><button class="primary sm" data-deny="${a.id}" style="min-height:38px">Stop it</button><button class="sm" data-approve="${a.id}" style="min-height:38px">It's fine</button></div></div>`).join('')}</div>` : ''}
       <p class="lead" style="font-size:18px;margin:0 0 20px">Hello ${esc(u.name)}. Here's what EMCON did across your browsers in the last 7 days.</p>
       <div class="kpis">
         <div class="kpi"><span>Scams blocked</span><b class="${w.blocked ? 'bad' : ''}">${w.blocked || 0}</b><small>across ${plural(S.devices.length, 'browser')}</small></div>
@@ -65,7 +72,12 @@ const VIEWS = {
         <div class="row" style="margin-top:10px"><button class="primary" id="qGo">Check safely</button><span class="small muted">The link is followed on our server; it never opens in your browser.</span></div>
         <div id="qOut" style="margin-top:12px"></div>
       </div>`;
-  }, wire() { $('#qGo').onclick = () => runCheck($('#q').value, $('#qOut'), $('#qGo')); } },
+  }, wire() {
+    $('#qGo').onclick = () => runCheck($('#q').value, $('#qOut'), $('#qGo'));
+    const decide = (aid, decision) => async () => { await api(`/api/me/approvals/${aid}`, { method: 'POST', body: { decision } }); toast(decision === 'approve' ? 'They can continue now' : 'Stopped. Their browser stays blocked'); refresh(); };
+    $('[data-approve]').forEach((b) => (b.onclick = decide(b.dataset.approve, 'approve')));
+    $('[data-deny]').forEach((b) => (b.onclick = decide(b.dataset.deny, 'deny')));
+  } },
 
   devices: { title: 'Browsers & family', render() {
     const owners = [{ id: '', name: `${S.user.name} (you)` }, ...S.family];
@@ -95,6 +107,53 @@ const VIEWS = {
     $$('[data-pair]').forEach((b) => (b.onclick = () => pair(b.dataset.pair)));
     $$('[data-rmdev]').forEach((b) => (b.onclick = async () => { if (confirm('Disconnect this browser? It keeps protecting, but stops reporting to your dashboard.')) { await api(`/api/me/devices/${b.dataset.rmdev}/remove`, { method: 'POST' }); refresh(); } }));
     $$('[data-rmfam]').forEach((b) => (b.onclick = async () => { if (confirm('Remove this person and disconnect their browsers?')) { await api(`/api/me/family/${b.dataset.rmfam}/remove`, { method: 'POST' }); refresh(); } }));
+  } },
+
+  photos: { title: 'Photo signing', render() {
+    const p = S.publisher;
+    return `
+      <p class="lead" style="font-size:17px;margin:0 0 18px">For newsrooms, brands and creators. Sign your photos so anyone with EMCON sees who published them, and whether they were edited later. Copies re-uploaded without the signature are recognised too.</p>
+      <div class="card">
+        <h3 style="margin-top:0">1. Prove you own your website</h3>
+        ${p?.verified ? `<div class="notice ok"><b>${esc(p.domain)} is verified</b> (by ${esc(p.method || 'file')}). Your photos show as <i>Verified · ${esc(p.domain)}</i>.</div>`
+          : `<p class="small muted" style="margin-top:0">Your photos are labelled with your website’s name, so we check that the website is really yours.</p>
+          <div class="row" style="flex-wrap:nowrap"><input id="pubDomain" placeholder="news.example.com" value="${esc(p?.domain || '')}"><button class="primary" id="pubStart" style="flex:none">${p ? 'Change website' : 'Add website'}</button></div>
+          ${p ? `<div style="margin-top:14px"><p class="small" style="margin:0 0 6px">Put this text in <span class="mono">https://${esc(p.domain)}/.well-known/emcon-publisher.txt</span>, or in a DNS TXT record named <span class="mono">_emcon.${esc(p.domain)}</span>:</p>
+            <div class="keybox" style="font-size:15px">${esc(p.token)}</div><button id="pubVerify">Check now</button><span id="pubMsg" class="small" style="margin-left:10px"></span></div>` : ''}`}
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">2. Sign a photo</h3>
+        <p class="small muted" style="margin-top:0">PNG or JPEG. The signed copy downloads to your computer; publish that file.${p?.verified ? '' : ' Until your website is verified, people see “Signed · unknown signer”.'}</p>
+        <label for="phTitle">Title or caption</label><input id="phTitle" placeholder="e.g. Flood relief camp, Kochi, 23 Oct">
+        <label for="phFile" style="margin-top:12px">Photo</label><input id="phFile" type="file" accept="image/png,image/jpeg">
+        <button class="primary" id="phSign" style="margin-top:14px">Sign and download</button>
+        <div id="phOut" class="small" style="margin-top:10px"></div>
+      </div>`;
+  }, wire() {
+    $('#pubStart')?.addEventListener('click', async () => { try { await api('/api/me/publisher', { method: 'POST', body: { domain: $('#pubDomain').value } }); refresh(); } catch (e) { toast(e.message); } });
+    $('#pubVerify')?.addEventListener('click', async () => {
+      $('#pubMsg').textContent = 'Checking…';
+      try { await api('/api/me/publisher/verify', { method: 'POST' }); toast('Website verified'); refresh(); } catch (e) { $('#pubMsg').textContent = e.message; $('#pubMsg').className = 'small bad'; }
+    });
+    $('#phSign').onclick = async () => {
+      const f = $('#phFile').files[0];
+      if (!f) { $('#phOut').textContent = 'Choose a photo first.'; return; }
+      $('#phSign').disabled = true; $('#phOut').textContent = 'Signing…';
+      try {
+        const { dhash } = await import('/lib/dhash.js');
+        const bmp = await createImageBitmap(f);
+        const fp = await dhash(bmp);
+        const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(f); });
+        const out = await api('/api/me/sign', { method: 'POST', body: { image: b64, title: $('#phTitle').value, dhash: fp } });
+        const bytes = Uint8Array.from(atob(out.image), (c) => c.charCodeAt(0));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([bytes], { type: f.type }));
+        a.download = f.name.replace(/(\.[a-z]+)$/i, '-signed$1');
+        a.click();
+        $('#phOut').innerHTML = `<span class="ok">Signed and downloaded.</span> Publish the downloaded file. People with EMCON will see <b>${out.verified ? 'Verified · ' + esc(out.manifest.issuer.name) : 'Signed · unknown signer'}</b>.`;
+      } catch (e) { $('#phOut').textContent = e.message; }
+      $('#phSign').disabled = false;
+    };
   } },
 
   api: { title: 'Link-check API', render() {
@@ -250,6 +309,13 @@ function route() {
   VIEWS[name].wire?.();
 }
 async function refresh() { await load(); route(); }
+// new payment checks from family members appear within seconds, without a reload
+setInterval(async () => {
+  if (document.hidden || document.querySelector('.modal-bg') || document.activeElement?.matches?.('input, textarea')) return;
+  const before = JSON.stringify((S?.approvals || []).map((a) => a.id + a.status));
+  try { await load(); } catch { return; }
+  if (JSON.stringify((S.approvals || []).map((a) => a.id + a.status)) !== before) route();
+}, 8000);
 addEventListener('hashchange', route);
 // the extension sets its marker a moment after load; re-render the checklist once it has
 await refresh();

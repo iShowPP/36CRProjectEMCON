@@ -7,6 +7,9 @@ const PUBLIC_URL = (process.env.EMCON_PUBLIC_URL || process.env.RENDER_EXTERNAL_
 const ALT_URL = (process.env.EMCON_ALT_URL || '').replace(/\/+$/, '');
 
 export const HOSTED = !!PUBLIC_URL;
+// The made-up demo world (test/site pages, a fictional bank and shop, demo reports and
+// newsroom keys) exists only for the automated tests. The real product never serves it.
+export const DEMO = process.env.EMCON_DEMO_SITE === '1';
 export const OFFICIAL_HOST = HOSTED ? new URL(PUBLIC_URL).hostname : 'localhost';
 export const ALT_HOST = ALT_URL ? new URL(ALT_URL).hostname : HOSTED ? null : '127.0.0.1';
 

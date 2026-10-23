@@ -8,7 +8,7 @@ import { dhash } from './lib/dhash.js';
 import { domTokens, simhash64 } from './lib/simhash.js';
 import { computeTrust, scoreDomain } from './lib/trustgraph.js';
 import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
-import { normDomain, isIp, isLocal, registrable, imitation } from './lib/domains.js';
+import { normDomain, isIp, isLocal, registrable, sameSite, imitation } from './lib/domains.js';
 import { lureFindings, urlsIn, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
 import { receiptDigest } from './lib/receipt.js';
 import { encodeQr, decodeQr, makeContact, makeAttestation, verifyQr } from './lib/qrtrust.js';
@@ -79,6 +79,25 @@ async function accountPair({ code }) {
   await local.set('device', { token: r.deviceToken, account: r.account.name, owner: r.owner, name, at: Date.now() });
   await reportStats(true);
   return accountStatus();
+}
+// Payment brake: ask the account owner to check a blocked payment page first.
+async function brakeInfo() {
+  const d = await local.get('device');
+  return d ? { connected: true, account: d.account, owner: d.owner } : { connected: false };
+}
+async function brakeRequest({ domain, reasons }) {
+  const d = await local.get('device');
+  if (!d) throw new Error('Connect this browser to an EMCON account first (More → Settings → EMCON account).');
+  return api('/api/devices/approval', { method: 'POST', body: { token: d.token, domain: String(domain || ''), reasons: (reasons || []).slice(0, 5) } });
+}
+async function brakeStatus({ id }) {
+  const d = await local.get('device');
+  if (!d) throw new Error('not connected');
+  const { server } = await settings();
+  const r = await fetch(`${server}/api/devices/approval/${encodeURIComponent(String(id))}`, { headers: { 'x-device-token': d.token }, credentials: 'omit' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'request failed');
+  return j;
 }
 async function accountStatus() {
   const d = await local.get('device');
@@ -468,6 +487,18 @@ async function wotAnalyze(page, sender) {
     else check('ratings', 'Ratings from verified people', 'clear', sum.unverified ? `No verified ratings yet (${sum.unverified} unverified not counted)` : 'Nobody has rated this site yet');
   } catch { /* ratings are optional */ }
 
+  // 1c. Checkout script-change alarm (payment pages only)
+  if (tabId != null && page.payment && Array.isArray(page.scripts)) {
+    const c = await checkoutScripts(sender.url, page.scripts).catch(() => null);
+    const since = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    if (c?.status === 'first') check('scripts', 'Payment page scripts', 'note', `First visit to this payment page: EMCON recorded its ${c.count} scripts and will warn you if a new outside script appears before you pay`);
+    else if (c?.status === 'alarm') {
+      check('scripts', 'Payment page scripts', 'found', `A script from ${list(c.newHosts)} appeared on this payment page since your visit on ${since(c.since)}. A new outside script can read card details as you type them (a "Magecart" skimming attack). Don't enter card details unless you know why it changed.`, 30);
+      strong.push('a new outside script on the payment page');
+    } else if (c?.status === 'changed') check('scripts', 'Payment page scripts', 'note', `${c.added.length ? `${c.added.length} new script(s) from domains this page already used` : ''}${c.added.length && c.changed.length ? ', and ' : ''}${c.changed.length ? `${c.changed.length} script(s) with changed content` : ''} since ${since(c.since)}. Sites update their scripts often, so this alone isn't a warning`);
+    else if (c) check('scripts', 'Payment page scripts', 'clear', `The same ${c.count} scripts as on your first visit (${since(c.since)})`);
+  }
+
   // 2. Domain age (public RDAP registry)
   if (isLocal(host)) check('age', 'Domain age (public registry)', 'na', 'Local or IP address: there is no public registration to look up');
   else {
@@ -575,7 +606,7 @@ async function wotAnalyze(page, sender) {
 
   // A good reputation never cancels scam evidence on the page itself: reputable sites get
   // hacked and used to host phishing kits, so vouches stop counting once the page shows it.
-  const pageEvidence = checks.some((c) => c.status === 'found' && ['chain', 'clone', 'lookalike'].includes(c.id));
+  const pageEvidence = checks.some((c) => c.status === 'found' && ['chain', 'clone', 'lookalike', 'scripts'].includes(c.id));
   for (const c of checks) {
     if (pageEvidence && c.status === 'good' && c.pts < 0) {
       risk -= c.pts;
@@ -649,6 +680,65 @@ async function wotAttest({ domain, verdict, transacted, note }) {
     credentialSubject: { id: 'dns:' + domain, domain, verdict, transacted: !!transacted, note: String(note || '').slice(0, 200) },
   }, privateKey, did);
   await api('/api/wot/attest', { method: 'POST', body: vc });
+  return true;
+}
+
+// ---------- checkout script-change alarm (Magecart-style skimmers) ----------
+// Trust on first use: the first time you see a payment page, EMCON records its scripts and a
+// fingerprint of each one's content. Later, a script from a NEW outside domain raises the alarm
+// before you type card details. Content changes and new first-party files are shown as notes:
+// sites redeploy and ad scripts update constantly, and crying wolf would teach people to ignore it.
+const checkoutKey = (u) => { const x = new URL(u); return x.origin + x.pathname.split('/').map((p) => (/^\d+$|^[0-9a-f-]{16,}$/i.test(p) ? ':id' : p)).join('/'); };
+// app.3f2a9c1e.js and app.71b0c2d4.js are the same script after a deploy
+const scriptId = (s) => { try { const u = new URL(s); if (!/^https?:$/.test(u.protocol)) return u.protocol + 'inline'; return u.origin + u.pathname.replace(/[.-][0-9a-f]{6,}(?=[.-])/gi, '.*').replace(/\d{6,}/g, '*'); } catch { return null; } };
+const scriptHashes = new Map();
+function scriptHash(src) {
+  if (!scriptHashes.has(src)) {
+    scriptHashes.set(src, (/^https?:/.test(src) ? fetch(src, { credentials: 'omit' }).then((r) => (r.ok ? r.arrayBuffer() : null)) : Promise.resolve(new TextEncoder().encode(src)))
+      .then(async (b) => (b ? toHex(await sha256(new Uint8Array(b))).slice(0, 16) : null)).catch(() => null));
+    if (scriptHashes.size > 400) scriptHashes.delete(scriptHashes.keys().next().value);
+  }
+  return scriptHashes.get(src);
+}
+async function checkoutScripts(pageUrl, srcs) {
+  const key = checkoutKey(pageUrl);
+  const site = normDomain(new URL(pageUrl).hostname);
+  const items = [];
+  for (const src of [...new Set(srcs)].slice(0, 60)) {
+    const id = scriptId(src);
+    if (!id || items.some((i) => i.id === id)) continue;
+    let host = 'an inline data: or blob: script';
+    try { if (/^https?:/.test(src)) host = normDomain(new URL(src).hostname); } catch { /* keep */ }
+    items.push({ id, src: src.slice(0, 300), host, third: host !== site && !(host.includes('.') && sameSite(host, site)), hash: await scriptHash(src) });
+  }
+  const all = (await local.get('checkouts')) || {};
+  const base = all[key];
+  if (!base) {
+    all[key] = { first: Date.now(), visits: 1, scripts: Object.fromEntries(items.map((i) => [i.id, { host: i.host, third: i.third, hash: i.hash }])) };
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 300))) delete all[k];
+    await local.set('checkouts', all);
+    return { status: 'first', count: items.length };
+  }
+  base.visits = (base.visits || 1) + 1;
+  base.last = Date.now();
+  const knownHosts = new Set(Object.values(base.scripts).map((s) => s.host));
+  const added = items.filter((i) => !base.scripts[i.id]);
+  const changed = items.filter((i) => base.scripts[i.id]?.hash && i.hash && base.scripts[i.id].hash !== i.hash);
+  const newHosts = [...new Set(added.filter((i) => i.third && !knownHosts.has(i.host)).map((i) => i.host))];
+  base.pending = [...added, ...changed];
+  await local.set('checkouts', all);
+  return { status: newHosts.length ? 'alarm' : added.length || changed.length ? 'changed' : 'same', newHosts, added, changed, count: items.length, since: base.first, visits: base.visits };
+}
+async function checkoutAccept({ url }) {
+  const all = (await local.get('checkouts')) || {};
+  const base = all[checkoutKey(url)];
+  if (base?.pending) {
+    for (const i of base.pending) base.scripts[i.id] = { host: i.host, third: i.third, hash: i.hash };
+    base.accepted = Date.now();
+    delete base.pending;
+    await local.set('checkouts', all);
+  }
   return true;
 }
 
@@ -878,6 +968,10 @@ const HANDLERS = {
   'wot:tab': async ({ tabId }) => (await chrome.storage.session.get('verdict_' + tabId))['verdict_' + tabId] || null,
   'prov:tab': async ({ tabId }) => { const tab = await chrome.tabs.get(tabId).catch(() => null); const t = tabImages.get(tabId); return t && tab?.url === t.url ? t.counts : {}; },
   'stats:week': weekStats,
+  'checkout:accept': checkoutAccept,
+  'brake:info': brakeInfo,
+  'brake:request': brakeRequest,
+  'brake:status': brakeStatus,
   'rate:get': rateGet,
   'rate:submit': rateSubmit,
   'qr:contact': qrContact,
@@ -907,7 +1001,7 @@ const HANDLERS = {
     return s;
   },
 };
-const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze', 'privacy:features', 'privacy:consent', 'receipt:open']);
+const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze', 'privacy:features', 'privacy:consent', 'receipt:open', 'checkout:accept', 'brake:info', 'brake:request', 'brake:status']);
 
 // First install: show the welcome page once (unpacked reloads don't repeat it).
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {

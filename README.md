@@ -13,8 +13,8 @@ AI detectors fail in two directions: they flag real content, and attackers learn
 | **Privacy promise monitor** | "Does the privacy policy sound nice?" | "Which third parties did the page actually contact, and did tracking stop after I said no?" | Per-tab request log, page-side feature monitor, `<meta name="privacy-promise">`, legal baseline |
 | **Evidence receipts** | "Trust our 82% risk score." | "Here is every check: found, clear, unknown or not applicable. Signed and timestamped." | VC signed by your did:key + server timestamp over the digest |
 | **Provenance** | "Is this image AI-generated?" | "Who signed it, and has it changed since?" | Ed25519 manifests in PNG/JPEG (C2PA-lite), perceptual-hash soft binding |
-| **Ghost sign-in** | "Who is this user?" | "Can they *prove* they're a verified adult, without revealing who they are?" | RSA blind signatures (RFC 9474-style), per-site Ed25519 keys, WebAuthn |
-| **Honey-Vault** | "Does this payment look fraudulent?" | "Has it waited out a risk-scaled delay and passed check-ins and guardians?" | Time-locks, m-of-n guardians, duress decoy, Solidity contract |
+| **Ghost sign-in** | "Who is this user?" | "Can they *prove* they're a verified adult, without revealing who they are?" | RSA blind signatures (RFC 9474-style), per-site Ed25519 keys, WebAuthn. Runs on EMCON's own login without email or password |
+| **Payment brake on real sites** | "Does this payment look fraudulent?" | "Has it waited out a cooling-off pause and passed family approval?" | Real-time family approval via EMCON dashboard, 5-minute cooling off pause on flagged payment pages |
 | **Anti-fingerprinting** | (nothing) | "Can a tracker recognise this device on the next visit?" | Secret per-visit noise applied before any page script, bucketed hardware values, Global Privacy Control |
 
 ---
@@ -61,50 +61,54 @@ Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, PayP
    ```bash
    npm run pack -- --server=https://emcon-xxxx.onrender.com
    ```
-4. Attach `dist/emcon-extension-v1.0.0.zip` to a GitHub Release so people can download it.
+4. Attach `dist/emcon-extension-v1.5.0.zip` to a GitHub Release so people can download it.
 
 Anywhere else: `docker build -t emcon . && docker run -p 8787:8787 -e EMCON_SECRET=<random> -e EMCON_PUBLIC_URL=https://your.host emcon`.
 
 | Variable | Meaning |
 |---|---|
 | `EMCON_SECRET` | All server keys are derived from it. Keep it fixed and the keys survive restarts, even on hosts that wipe the disk. |
+| `DATABASE_URL` | PostgreSQL connection string (provided automatically by Render's Postgres `emcon-db`). When present, state is kept in Postgres; otherwise, falls back to `data/db.json`. |
 | `EMCON_PUBLIC_URL` | Public https address (auto-detected on Render). |
-| `EMCON_ALT_URL` | Optional second hostname for the same server. It enables the "different company" and Kestrel-clone demos when hosted. |
+| `EMCON_ALT_URL` | Optional second hostname for the same server. |
 | `EMCON_FEED=off` / `EMCON_FEED_URL` | Disable or replace the live phishing feed. |
 | `EMCON_ALERT_WEBHOOK` | e.g. `https://ntfy.sh/<topic>` to push guardian alerts to phones. |
 | `EMCON_DATA`, `PORT` | Data folder and port. |
 
-## Quick start for the demo (one command)
+## Quick start (local development)
 
-Requires **Node 22+** (no `npm install`, zero dependencies) and **Chrome, Edge or Brave**.
+Requires **Node 22+** and **Chrome, Edge or Brave**.
 
 ```bash
-npm run demo
+npm install            # installs pg driver for persistence
+npm start              # starts server on :8787
 ```
 
-On Windows you can also just double-click **`start-demo.cmd`**.
-
-This starts the server on `:8787` and opens a browser window with the EMCON extension **already loaded**, in its own profile (`data/browser-profile`), so your normal browser is never touched. It also sets up Ghost with demo PIN **2468**, so every flow works straight away. Close the window (or press Ctrl+C) to stop.
-
-- Pick the browser: `npm run demo -- --browser=brave` (or `edge` / `chrome`), or `start-demo.cmd --browser=brave`. Each browser gets its own demo profile.
-- `npm run demo:fresh` starts from a clean profile so you can show the Ghost setup (passkey/PIN) yourself.
-- `npm start` runs only the server. Then load the extension by hand: `chrome://extensions` → **Developer mode** → **Load unpacked** → pick `extension/`.
-
-| PIN | Where |
-|---|---|
-| `2468` | Ghost sign-in consent window |
-| `1234` | Kestrel Bank vault (real) |
-| `9999` | Kestrel Bank vault (duress) |
+Load the extension into your browser:
+1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
+2. Click **Load unpacked** and select the `extension/` folder.
+3. Open `http://localhost:8787/` to view the SaaS landing page, `/app` for the dashboard, or `/real.html` for the real-internet guide.
 
 ### Tests
 
 ```bash
-npm test               # 57 API tests against the live server
-npm run test:browser   # 29 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts
+npm test               # 60 API tests against the live server
+npm run test:browser   # 32 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts, Magecart alarms
 npm run test:all       # both
 ```
 
 Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
+
+## Checkout script-change alarm (Magecart)
+
+Card skimmers ("Magecart") are scripts slipped into a real shop's payment page, often injected after it loads, that copy card details as you type. Few consumer tools watch for them.
+
+- **Trust on first use.** The first time you see a payment page (one that asks for card number, CVV or expiry), EMCON records its scripts and a fingerprint of each one's content.
+- **Alarm.** On later visits, a script from a **new outside domain** raises an amber warning before you type, and again when you click into a card field: *"A script from cdn-x.com appeared on this payment page since your visit on 23 Oct… Don't enter card details unless you know why it changed."* Scripts injected after load are caught too.
+- **Low noise.** Sites redeploy and ad scripts update constantly, so content changes, renamed bundles (`app.3f2a.js`) and new files from domains the page already used are shown as notes, not warnings.
+- **Reputation doesn't cancel it.** Magecart hits reputable shops, so a good reputation never outweighs this alarm.
+- **Trust this change** accepts a legitimate change for that page.
+- Test fixture: in test mode (`EMCON_DEMO_SITE=1`), open `/checkout.html`, then `/checkout.html?compromised=1` (a harmless script from another domain is injected after load).
 
 ## Trust by QR code, and community ratings
 
@@ -114,14 +118,16 @@ Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe
 
 ## The product site (SaaS)
 
-`/` is now a product landing page with a hand-drawn 3D scene (canvas, no library): scam links bounce off the EMCON shield, safe ones pass. The old demo hub moved to [/demo.html](/demo.html).
+`/` is a full SaaS product site with accounts, subscriptions, family protection, link checking API, publisher photo signing, and real-time payment approvals. The real-internet interactive guide is at [/real.html](/real.html). Automated test fixtures live in `test/site/` (never served on the live product site).
 
 | Page | What it does |
 |---|---|
 | `/signup`, `/login` | Email + password (scrypt) or **Continue with EMCON Ghost** (no email at all). Signup shows a **recovery key**: no email resets, so nobody can talk support into handing over an account. |
 | `/recover` | Reset the password with the recovery key; signs out every other session and issues a new key. |
-| `/app` | Dashboard: weekly protection across your browsers, alerts, a message/link checker, **Browsers & family** (6-digit pairing codes typed into the extension), **Link-check API** keys, **Plan & billing**, settings (password, recovery key, sign-out everywhere, data export, account deletion). |
-| `/privacy`, `/terms` | Drafts for the hackathon build. |
+| `/app` | Dashboard: weekly protection across your browsers, alerts, **Waiting for you** (payment brake approvals), **Photos** (publisher domain verification & photo signing), a message/link checker, **Browsers & family** (6-digit pairing codes typed into the extension), **Link-check API** keys, **Plan & billing**, settings (password, recovery key, sign-out everywhere, data export, account deletion). |
+| `/real.html` | Real-world interactive guide: walk through every shield on live websites across the real internet. |
+| `/verify.html` | Receipt verifier: check any EMCON evidence receipt and its cryptographic timestamp signature. |
+| `/privacy`, `/terms` | Privacy policy and terms of service. |
 
 Connected browsers report **weekly counts only** (pages checked, scams blocked…), never addresses; a family member's new block shows up as an alert. Sessions are HttpOnly SameSite cookies, every write must come from our own origin, sign-in is rate-limited, and session tokens, API keys and recovery keys are stored only as hashes.
 
@@ -256,13 +262,11 @@ server/  (Node 22+, zero dependencies)
   wot.js     attestation relay + brand fingerprints + live phishing feed
   timestamp.js  receipt timestamps (signs digest + time, never sees contents)
 
-web/        demo pages (overview, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone,
-            prize SMS + claim page, newspaper, receipt verifier, real-internet guide)
+web/        SaaS product pages (landing page, dashboard, login/signup, password recovery, real-internet guide, receipt verifier, legal)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (57 API tests) · extension.mjs (29 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
+test/       e2e.mjs (60 API tests) · extension.mjs (32 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs) · site/ (test-only demo pages)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
-scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)
 ```
 
 ## Honest limitations (say these before a judge does)
@@ -276,9 +280,7 @@ scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.c
 - **The WebAuthn gate is a local user-presence check.** Encrypting the master secret with the passkey's PRF output is next on the roadmap.
 - **"C2PA-lite"** uses its own manifest format. It detects real C2PA but doesn't fully validate it (that needs the c2pa-rs SDK).
 - **Registrable-domain logic** uses a small built-in suffix list rather than the full Public Suffix List.
-- Stores data in a single JSON file (`data/db.json`). Swap in SQLite/Postgres for real use.
-- **Render's free plan sleeps when idle and wipes its disk.** Keys survive (they come from `EMCON_SECRET`), but demo data such as shop accounts, user reports and signed photos resets. Add a persistent disk (paid) or Postgres to keep it. The first request after sleeping takes about 50 s.
+- **Render's free web service sleeps when idle.** With `DATABASE_URL` configured (free Render Postgres), all accounts, family devices, approvals and ratings survive restarts and redeploys. On cold start after sleeping, the free instance takes about 50 s to spin up.
 - **Scam wording lists are English-only for now** (prize, threat, fee, urgency phrases). Hindi and other languages are the obvious next step.
 - **The privacy monitor sees requests and API calls, not data contents.** A hostile page could also block the page-side feature events (not the network log). The network observations come from the browser itself and can't be hidden by the page.
-- **Ghost needs websites to adopt it.** Only the demo shop accepts EMCON sign-in today. Phishing, look-alike, fingerprinting and provenance protection work on every site.
 - **The OpenPhish community feed** is free for non-commercial use. Commercial deployments need their premium feed or another source (`EMCON_FEED_URL`).

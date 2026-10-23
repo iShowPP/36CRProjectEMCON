@@ -10,7 +10,9 @@ import crypto from 'node:crypto';
 import { db, save, HttpError } from './store.js';
 import { HOSTED } from './config.js';
 import { checkPresentation, spendToken } from './rp.js';
-import { expandLink } from './link.js';
+import { expandLink, assertPublic } from './link.js';
+import { signForPublisher } from './prov.js';
+import dns from 'node:dns/promises';
 import { REAL_BRANDS } from './brands.js';
 import { normDomain, registrable, imitation } from '../extension/lib/domains.js';
 import { lureFindings, urlsIn, SHORTENERS } from '../extension/lib/signals.js';
@@ -192,6 +194,8 @@ export default async function accounts(route) {
     return {
       user: publicUser(u), plans: Object.values(PLANS), devices, family: u.family, week,
       alerts: (u.alerts || []).slice(0, 20), invoices: u.invoices, audit: (u.audit || []).slice(0, 10),
+      approvals: (u.approvals || []).slice(0, 20),
+      publisher: u.publisher ? { domain: u.publisher.domain, token: u.publisher.token, verified: !!u.publisher.verified, method: u.publisher.method || null } : null,
       keys: Object.entries(A.keys).filter(([, k]) => k.uid === u.id).map(([kid, k]) => ({ id: kid, name: k.name, prefix: k.prefix, created: k.created, lastUsed: k.lastUsed || null })),
       usage: { today: u.usage[day()] || 0, limit: (PLANS[u.plan] || PLANS.free).apiPerDay },
     };
@@ -340,6 +344,88 @@ export default async function accounts(route) {
     d.lastSeen = Date.now();
     save();
     return { ok: true, account: u ? { name: u.name } : null, owner: d.owner };
+  });
+
+  // ---------- publishers: prove you own a website, then sign your photos ----------
+  const cleanDomain = (d) => String(d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#:].*$/, '').replace(/^www\./, '');
+  route('POST', '/api/me/publisher', (ctx) => {
+    const u = me(ctx);
+    const domain = cleanDomain(ctx.body.domain);
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) throw new HttpError(400, 'Enter your website, like news.example.com.');
+    const taken = Object.values(A.users).find((x) => x.id !== u.id && x.publisher?.verified && x.publisher.domain === domain);
+    if (taken) throw new HttpError(409, 'Another account has already verified that website.');
+    u.publisher = { domain, token: 'emcon-publisher=' + crypto.randomBytes(12).toString('hex'), verified: false, started: Date.now() };
+    save();
+    return { publisher: { domain, token: u.publisher.token, verified: false } };
+  });
+  route('POST', '/api/me/publisher/verify', async (ctx) => {
+    const u = me(ctx);
+    const p = u.publisher;
+    if (!p) throw new HttpError(400, 'Add your website first.');
+    limit('pubverify:' + u.id, 20, 60 * 60e3);
+    let found = false, how = '';
+    // 1. a file on the website itself
+    try {
+      await assertPublic(p.domain);
+      const r = await fetch(`https://${p.domain}/.well-known/emcon-publisher.txt`, { redirect: 'manual', signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'EMCON publisher check' } });
+      if (r.ok) { const text = (await r.text()).slice(0, 4096); if (text.includes(p.token)) { found = true; how = 'file'; } }
+    } catch { /* try DNS next */ }
+    // 2. or a DNS TXT record
+    if (!found) {
+      try { if ((await dns.resolveTxt('_emcon.' + p.domain)).some((rec) => rec.join('').includes(p.token))) { found = true; how = 'DNS'; } } catch { /* not found */ }
+    }
+    if (!found) throw new HttpError(400, `We couldn't find the code yet. Put it in https://${p.domain}/.well-known/emcon-publisher.txt or in a DNS TXT record for _emcon.${p.domain}, then try again.`);
+    p.verified = true; p.verifiedAt = Date.now(); p.method = how;
+    audit(u, `Publisher website ${p.domain} verified by ${how}`, ctx);
+    save();
+    return { publisher: { domain: p.domain, verified: true, method: how } };
+  });
+  route('POST', '/api/me/sign', async (ctx) => {
+    const u = me(ctx);
+    limit('sign:' + u.id, 200, 24 * 3600e3);
+    const { bytes, manifest } = await signForPublisher(u, ctx.body.image, ctx.body.title, ctx.body.dhash);
+    return { image: Buffer.from(bytes).toString('base64'), manifest, verified: !!u.publisher?.verified };
+  });
+
+  // ---------- payment brake: a family member checks a risky payment first ----------
+  // A connected browser that EMCON blocked on a page asking for card/OTP/bank details can ask
+  // the account owner to look. They see the site and EMCON's reasons, and approve or stop it.
+  const deviceByToken = (t) => Object.entries(A.devices).find(([, d]) => d.tokenHash === sha(String(t || '')));
+  route('POST', '/api/devices/approval', (ctx) => {
+    const found = deviceByToken(ctx.body.token);
+    if (!found) throw new HttpError(401, 'This browser is not connected to an EMCON account.');
+    const [did, d] = found;
+    limit('approval:' + did, 10, 60 * 60e3);
+    const u = A.users[d.uid];
+    if (!u) throw new HttpError(401, 'That account no longer exists.');
+    const domain = String(ctx.body.domain || '').toLowerCase().replace(/[^a-z0-9.:-]/g, '').slice(0, 120);
+    const reasons = (Array.isArray(ctx.body.reasons) ? ctx.body.reasons : []).map((r) => String(r).slice(0, 220)).slice(0, 5);
+    const a = { id: id(), device: did, owner: d.owner, deviceName: d.name, domain, reasons, at: Date.now(), status: 'pending' };
+    u.approvals = [a, ...(u.approvals || [])].slice(0, 50);
+    u.alerts ||= [];
+    u.alerts.unshift({ at: a.at, owner: d.owner, device: d.name, text: `${d.owner} asked you to check a payment on ${domain}` });
+    u.alerts.length = Math.min(u.alerts.length, 50);
+    save();
+    return { id: a.id, account: u.name };
+  });
+  route('GET', '/api/devices/approval/:aid', (ctx) => {
+    const found = deviceByToken(ctx.headers['x-device-token']);
+    if (!found) throw new HttpError(401, 'This browser is not connected to an EMCON account.');
+    const a = (A.users[found[1].uid]?.approvals || []).find((x) => x.id === ctx.params.aid && x.device === found[0]);
+    if (!a) throw new HttpError(404, 'No such request.');
+    return { status: a.status, decidedAt: a.decidedAt || null, note: a.note || '' };
+  });
+  route('POST', '/api/me/approvals/:aid', (ctx) => {
+    const u = me(ctx);
+    const a = (u.approvals || []).find((x) => x.id === ctx.params.aid);
+    if (!a) throw new HttpError(404, 'No such request.');
+    if (a.status !== 'pending') return { status: a.status };
+    a.status = ctx.body.decision === 'approve' ? 'approved' : 'denied';
+    a.decidedAt = Date.now();
+    a.note = String(ctx.body.note || '').slice(0, 200);
+    audit(u, `${a.status === 'approved' ? 'Approved' : 'Stopped'} a payment on ${a.domain} for ${a.owner}`, ctx);
+    save();
+    return { status: a.status };
   });
 
   // ---------- API keys + the link-check API ----------

@@ -1,7 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, MEDIA_DIR, HttpError, flush } from './store.js';
+import { ROOT, MEDIA_DIR, HttpError, flush, persistent } from './store.js';
 import issuer from './issuer.js';
 import rp from './rp.js';
 import prov from './prov.js';
@@ -11,7 +11,7 @@ import timestamp from './timestamp.js';
 import link from './link.js';
 import accounts from './accounts.js';
 import ratings from './ratings.js';
-import { publicUrls } from './config.js';
+import { publicUrls, DEMO } from './config.js';
 
 // Demo "link shortener" hops for the scam-chain demo: /s/qk50 -> /r?to=/claim.html -> /claim.html.
 // Only same-site paths are allowed, so this is not an open redirect.
@@ -23,7 +23,7 @@ const MIME = {
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
 // URL prefix -> directory. /lib exposes the extension's shared crypto to the demo pages.
-const STATIC = [['/lib/', path.join(ROOT, 'extension', 'lib')], ['/media/', MEDIA_DIR], ['/', path.join(ROOT, 'web')]];
+const STATIC = [['/lib/', [path.join(ROOT, 'extension', 'lib')]], ['/media/', [MEDIA_DIR]], ['/', [path.join(ROOT, 'web'), ...(DEMO ? [path.join(ROOT, 'test', 'site')] : [])]]];
 
 export async function createApp() {
   const routes = [];
@@ -32,8 +32,8 @@ export async function createApp() {
     const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
     routes.push({ method, re, keys, handler });
   };
-  for (const mod of [issuer, rp, prov, vault, wot, timestamp, link, accounts, ratings]) await mod(route);
-  route('GET', '/api/config', ({ origin }) => publicUrls(origin));
+  for (const mod of [issuer, prov, wot, timestamp, link, accounts, ratings, ...(DEMO ? [rp, vault] : [])]) await mod(route);
+  route('GET', '/api/config', ({ origin }) => ({ ...publicUrls(origin), persistent }));
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -42,9 +42,9 @@ export async function createApp() {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
 
-    const short = /^\/s\/(\w+)$/.exec(url.pathname);
+    const short = DEMO && /^\/s\/(\w+)$/.exec(url.pathname);
     if (short) return res.writeHead(302, { location: '/r?to=' + encodeURIComponent(SHORT_LINKS[short[1]] || '/') }).end();
-    if (url.pathname === '/r') return res.writeHead(302, { location: safePath(url.searchParams.get('to')) }).end();
+    if (DEMO && url.pathname === '/r') return res.writeHead(302, { location: safePath(url.searchParams.get('to')) }).end();
 
     if (url.pathname.startsWith('/api/')) {
       const send = (status, obj) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(obj));
@@ -92,10 +92,16 @@ function readJson(req) {
 }
 
 function serveStatic(pathname, res) {
-  const [prefix, dir] = STATIC.find(([p]) => pathname.startsWith(p));
-  let rel = decodeURIComponent(pathname.slice(prefix.length));
+  const [prefix, dirs] = STATIC.find(([p]) => pathname.startsWith(p));
+  let rel;
+  try { rel = decodeURIComponent(pathname.slice(prefix.length)); } catch { return res.writeHead(400).end(); }
   if (!rel || rel.endsWith('/')) rel += 'index.html';
-  else if (!path.extname(rel) && fs.existsSync(path.resolve(dir, rel + '.html'))) rel += '.html'; // clean URLs: /login
+  // first directory that has the file wins; clean URLs: /login -> login.html
+  let dir = dirs[0];
+  for (const d of dirs) {
+    if (fs.existsSync(path.resolve(d, rel))) { dir = d; break; }
+    if (!path.extname(rel) && fs.existsSync(path.resolve(d, rel + '.html'))) { dir = d; rel += '.html'; break; }
+  }
   const file = path.resolve(dir, rel);
   if (!file.startsWith(path.resolve(dir))) return res.writeHead(403).end();
   fs.stat(file, (err, st) => {

@@ -41,7 +41,7 @@
         <ol class="small" style="margin:6px 0 0;padding-left:18px">
           <li>Install the extension and set its server to <code id="here"></code>.</li>
           <li>Use <b>Chrome</b> or <b>Edge</b> for the fingerprinting demo: Brave already randomises canvas on its own.</li>
-          <li>Ghost sign-in needs a partner website that accepts it, so it stays on <a href="/rp.html">our demo shop</a>.</li>
+          <li>Try Ghost sign-in on <a href="/login">EMCON's login</a>: sign in with a humanity token, no email or password needed.</li>
         </ol>
         <div id="ext" class="small" style="margin-top:8px"></div>
       </div>
@@ -91,26 +91,27 @@
         <ol>
           <li>Click a real short link: <a href="https://youtu.be/jNQXAC9IVRw" target="_blank" rel="noopener">youtu.be/jNQXAC9IVRw</a> or <a href="https://aka.ms/terminal" target="_blank" rel="noopener">aka.ms/terminal</a>.</li>
           <li>On the page it lands on, open EMCON → <b>This site</b>.</li>
+          <li>Or paste an SMS with a short link into EMCON → <b>Check message</b>.</li>
         </ol>
-        <div class="expect"><b>You should see</b><i>How you got here</i>: this page → the short link → the HTTP redirect → the landing page. With no scam wording and no request for card details, it stays a note, not a warning. On a live phishing site (demo 02) the same row joins the block evidence. The full prize-SMS chain runs on <a href="/sms.html">our demo pages</a>, because we won't make a short link to a real scam site.</div>
+        <div class="expect"><b>You should see</b><i>How you got here</i>: this page → the short link → the HTTP redirect → the landing page. With no scam wording and no request for card details, it stays a note, not a warning. On a phishing site, the full chain joins the block evidence, showing how the message led to the fake form.</div>
       </div>
     </section>
 
     <section class="demo">
-      <div><div class="num">04</div><h2>Real and edited photos</h2><p class="why">These images are hosted on GitHub and on a public image CDN, not on this server. EMCON downloads and checks each one.</p></div>
+      <div><div class="num">04</div><h2>Real, edited and publisher-signed photos</h2><p class="why">These images are hosted on GitHub and on a public image CDN, not on this server. EMCON downloads and checks each one.</p></div>
       <div>
         <div class="gallery">
           <figure><img src="https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/CA.jpg" alt="C2PA sample image from the c2pa-rs project"><figcaption><b>Content Credentials · C2PA Signer</b>A real C2PA file from the Content Authenticity Initiative's own repository. EMCON reads the signer, issuer and timestamp authority.</figcaption></figure>
-          <figure><img src="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png" alt="Signed demo photo"><figcaption><b>Verified · Kestrel Daily News</b>Signed by our demo newsroom's key, hosted on GitHub.</figcaption></figure>
+          <figure><img src="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png" alt="Signed photo"><figcaption><b>Verified · News Publisher</b>Signed photo hosted on GitHub. Shows verified status and publisher identity.</figcaption></figure>
           <figure><img src="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/doctored-photo.png" alt="Edited copy of the signed photo"><figcaption><b>Altered after signing</b>Same photo with pixels changed, still carrying the original signature.</figcaption></figure>
-          <figure><img src="https://images.weserv.nl/?url=raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png&output=jpg" alt="Re-encoded copy with the signature stripped"><figcaption><b>Recovered · Kestrel Daily News</b>Re-encoded to JPEG by the images.weserv.nl CDN, which strips the signature. EMCON matches its visual fingerprint locally.</figcaption></figure>
+          <figure><img src="https://images.weserv.nl/?url=raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png&output=jpg" alt="Re-encoded copy with the signature stripped"><figcaption><b>Recovered · Visual fingerprint</b>Re-encoded to JPEG by the images.weserv.nl CDN, which strips the signature. EMCON matches its visual fingerprint locally.</figcaption></figure>
         </div>
         <ol style="margin-top:14px">
           <li>Hover a label and click it for the evidence. Each image also opens on its own host, with the same result.</li>
-          <li>Try it yourself: download the <a href="https://raw.githubusercontent.com/iShowPP/36CRProjectEMCON/main/docs/media/verified-photo.png" target="_blank" rel="noopener">signed photo</a>, post it anywhere that recompresses images, and view the posted copy.</li>
+          <li>Try publisher signing: In your EMCON dashboard → <a href="/app#photos">Photos</a>, verify domain ownership (via <code>/.well-known/emcon-publisher.txt</code> or DNS TXT) and sign any photo. Anyone with EMCON sees <i>Verified · yourdomain.com</i>.</li>
           <li>Cross-check the C2PA file with the official <a href="https://contentcredentials.org/verify" target="_blank" rel="noopener">contentcredentials.org/verify</a>.</li>
         </ol>
-        <div class="expect"><b>You should see</b>The four labels above, matching the captions. Images with no signature get no label at all: missing provenance proves nothing. EMCON reads C2PA details but doesn't validate the certificate chain; the official verifier does.</div>
+        <div class="expect"><b>You should see</b>The four labels above, matching the captions. Images with no signature get no label at all: missing provenance proves nothing. Verified publishers have their signatures recognized across the network.</div>
       </div>
     </section>
 
@@ -150,24 +151,53 @@
     </section>
 
     <section class="demo">
-      <div><div class="num">07</div><h2>Honey-Vault, with live scam data</h2><p class="why">Like Ghost sign-in, the vault lives inside a bank, so it runs on our demo bank. The scam data it checks payees against is live.</p></div>
+      <div><div class="num">07</div><h2>Real-internet payment brake</h2><p class="why">Scammers use artificial urgency to push people into hasty transfers. On any real site asking for card, bank, OTP or PIN details that EMCON flags, EMCON activates a payment brake.</p></div>
       <div>
         <ol>
-          <li>Open <a href="/vault.html">Kestrel Bank</a> and add a payee whose website is one of the live feed addresses from demo 02 (copy it from the list and replace [.] with a dot).</li>
-          <li>Send that payee a payment, for example $600.</li>
+          <li>In your EMCON dashboard (<a href="/app#devices">Dashboard → Devices</a>), connect a family member's browser using a 6-digit pairing code.</li>
+          <li>On the protected browser, open a flagged payment page or scam site asking for card or OTP details (e.g. from the live feed in demo 02).</li>
+          <li>EMCON stops the page with a red warning and enforces the <b>Payment Brake</b>: a mandatory 5-minute cooling-off timer (<code>Continue in 5:00</code>) to prevent rushed decisions.</li>
+          <li>Click <b>Ask [Family Member] to check it</b>. The request immediately appears in your family dashboard under <i>Waiting for you</i> with the site address and EMCON's evidence.</li>
+          <li>In the dashboard, click <b>It's fine</b> or <b>Stop it</b>. The protected browser updates in real time to allow the payment or enforce the family veto.</li>
         </ol>
-        <div class="expect"><b>You should see</b>The payment is held for your guardians, with the reason "flagged by OpenPhish live feed".</div>
+        <div class="expect"><b>You should see</b>The payment brake slows down risky transactions and gives family members a real-time veto without sharing browsing history — only flagged payment requests are sent.</div>
       </div>
     </section>
 
     <section class="demo">
-      <div><div class="num">08</div><h2>Evidence receipts</h2><p class="why">Proof of what EMCON observed and when, which anyone can check without trusting us.</p></div>
+      <div><div class="num">08</div><h2>Checkout script-change alarm (Magecart)</h2><p class="why">Credit card skimmers inject malicious scripts into real shopping checkout pages to steal card numbers as you type.</p></div>
       <div>
         <ol>
-          <li>After any demo above, save a receipt: EMCON → <b>This site</b> → <i>Save signed proof of this check</i> (it includes the privacy report), the same button under a message check, or click a photo's label → <i>Save signed proof</i>.</li>
-          <li>Open <a href="/verify.html">Verify a receipt</a> and drop the file in. Then change one character in the file and drop it in again.</li>
+          <li>Visit any checkout or payment page. On your first visit, EMCON records the scripts loaded by that page.</li>
+          <li>If an unfamiliar outside script domain appears on a subsequent visit (or gets injected after load), EMCON displays an amber alarm bar before you type your card details: <i>"A script from [domain] appeared on this payment page since your visit... Don't enter card details unless you know why it changed."</i></li>
+          <li>Focusing into any card or CVV field re-triggers the alarm if dismissed. If it is a legitimate update by the merchant, click <b>Trust this change</b> to record the new baseline.</li>
         </ol>
-        <div class="expect"><b>You should see</b>"Signature valid" and "countersigned by the EMCON server" with the time. The edited copy fails. The server only ever saw a hash of the receipt.</div>
+        <div class="expect"><b>You should see</b>A reputation-proof alarm: reputable stores can get hacked, so even high-reputation sites trigger this warning if an unexpected third-party script appears on the checkout page.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">09</div><h2>Ghost sign-in (Zero-knowledge)</h2><p class="why">Prove you are a real adult human without handing over your email, phone number, or personal identity.</p></div>
+      <div>
+        <ol>
+          <li>In EMCON extension → <b>More</b> → <b>Settings</b> → <b>EMCON Ghost</b>, click <b>Enrol</b> and complete enrolment to receive blinded humanity tokens.</li>
+          <li>Open the <a href="/login" target="_blank">EMCON login page</a> and click <b>Sign in with Ghost</b>.</li>
+          <li>The extension prompts for your PIN and confirmation. It spends one blind token and mints a per-site pseudonym.</li>
+          <li>You are logged in instantly. No email, no password, no tracking across sites.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>A new account created in seconds. The server verifies the cryptographic token signature but cannot link it to your real identity or any other site. Returning visits recognise the same per-site pseudonym without spending another token.</div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div><div class="num">10</div><h2>Evidence receipts & tamper-proof verification</h2><p class="why">Proof of what EMCON observed and when, which anyone can check without trusting us.</p></div>
+      <div>
+        <ol>
+          <li>After checking any site, message, or photo, click <b>Save signed proof</b>.</li>
+          <li>Open <a href="/verify.html" target="_blank">Verify a receipt</a> and drop the JSON receipt file in.</li>
+          <li>Now open the JSON file in an editor, change a single character (e.g. edit the date or verdict), and drop it in again.</li>
+        </ol>
+        <div class="expect"><b>You should see</b>The authentic file passes verification: "Signature valid" with the server timestamp. The edited file is immediately flagged: "Signature INVALID (file has been altered)". The server only ever saw a hash of the receipt.</div>
       </div>
     </section>
   </main>

@@ -1,13 +1,20 @@
 # One-click deploy: https://render.com/deploy?repo=https://github.com/iShowPP/36CRProjectEMCON
-# Free plan. Render gives the service a public https URL (RENDER_EXTERNAL_URL), which the
-# server uses as its official address. EMCON_SECRET is generated once by Render and every
-# server key is derived from it, so keys survive the free tier's restarts.
+# Render gives the service a public https URL (RENDER_EXTERNAL_URL), which the server uses as
+# its official address. EMCON_SECRET is generated once and every server key is derived from it.
+# Accounts, family, API keys and ratings live in the Postgres database below, so they survive
+# restarts and redeploys (the web service's own disk is wiped on the free plan).
+databases:
+  - name: emcon-db
+    plan: free
+    databaseName: emcon
+    user: emcon
+
 services:
   - type: web
     name: emcon
     runtime: node
     plan: free
-    buildCommand: "true"
+    buildCommand: npm install --omit=dev --no-audit --no-fund
     startCommand: node server/index.js
     healthCheckPath: /api/wot/groups
     envVars:
@@ -15,3 +22,7 @@ services:
         value: "22"
       - key: EMCON_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: emcon-db
+          property: connectionString

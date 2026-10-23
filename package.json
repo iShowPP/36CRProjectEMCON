@@ -1,19 +1,22 @@
 {
   "name": "emcon",
-  "version": "1.4.0",
-  "description": "EMCON — four non-AI shields against tracking, fake media, payment scams and phishing.",
+  "version": "1.5.0",
+  "description": "EMCON: scams explained before they cost you. Browser extension + SaaS, evidence instead of AI guesses.",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "demo": "node scripts/demo.mjs",
-    "demo:fresh": "node scripts/demo.mjs --fresh",
     "start": "node server/index.js",
     "test": "node test/e2e.mjs",
     "test:browser": "node test/extension.mjs",
     "test:all": "node test/e2e.mjs && node test/extension.mjs",
     "pack": "node tools/pack.mjs",
     "icons": "node tools/make-icons.mjs",
-    "reset":"node -e \"require('fs').rmSync('data',{recursive:true,force:true})\""
+    "reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "pg": "8.13.1"
   }
 }

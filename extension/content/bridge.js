@@ -106,6 +106,14 @@
     .wi .lede { margin: 0 0 22px; font-size: 18px; color: rgba(255,255,255,.94); max-width: 40em; }
     .safety { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border: 0; background: #fff; color: #b42318; font-size: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
     .safety:hover { background: #fef3f2; }
+    .brake { margin-top: 22px; padding: 20px 22px; border-radius: 16px; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.28); }
+    .brake h2 { margin: 0 0 4px; font: 700 19px/1.3 var(--font); color: #fff; }
+    .brake p { margin: 0; color: rgba(255,255,255,.92); }
+    .brake .brow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .brake button { padding: 11px 16px; border: 1px solid rgba(255,255,255,.7); background: transparent; color: #fff; font-size: 15px; }
+    .brake button.ask { background: #fff; color: #b42318; border-color: #fff; }
+    .brake button:disabled { opacity: .6; cursor: default; }
+    .brake .bmsg { margin-top: 10px; font-weight: 600; min-height: 1em; }
     .safety:focus-visible, .stay:focus-visible { outline: 3px solid rgba(255,255,255,.75); outline-offset: 3px; }
     .safety:focus:not(:focus-visible) { outline: none; }
     .sheet { margin-top: 28px; background: var(--surface); color: var(--text); border-radius: 16px; padding: 22px 24px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
@@ -245,7 +253,10 @@
     return [...found];
   }
 
+  const CARD = new Set(['card number', 'CVV', 'card expiry']);
   function pageFacts() {
+    const fields = sensitiveFields();
+    const isPayment = fields.some((f) => CARD.has(f));
     const pwForms = [...document.querySelectorAll('input[type=password]')].map((i) => i.form).filter(Boolean);
     const formHosts = pwForms.map((f) => { try { return new URL(f.getAttribute('action') || location.href, location.href).hostname; } catch { return ''; } });
     const promise = document.querySelector('meta[name="privacy-promise"]')?.content || '';
@@ -255,7 +266,9 @@
       html: document.documentElement.outerHTML.slice(0, 400000),
       hasPassword: !!document.querySelector('input[type=password]'),
       formHosts,
-      fields: sensitiveFields(),
+      fields,
+      payment: isPayment,
+      scripts: isPayment ? [...document.scripts].map((s) => s.src).filter(Boolean).slice(0, 80) : null,
       privacyPromise: promise ? promise.toLowerCase().split(/[\s,]+/).filter((t) => /^[a-z-]{3,40}$/.test(t)).slice(0, 10) : null,
     };
   }
@@ -275,8 +288,12 @@
     show(v);
   }
 
+  let lastVerdict = null;
   function show(v) {
     if (!v) return;
+    lastVerdict = v;
+    // the script alarm must reach you before card entry, even if you dismissed an earlier warning
+    if (v.level !== 'danger' && v.checks?.some((c) => c.id === 'scripts' && c.status === 'found')) { showBar(v); return; }
     const dismissed = sessionStorage.getItem('emcon-proceed') === v.domain;
     if (dismissed || v.level === shown) return;
     if (v.level === 'danger') showWall(v);
@@ -285,6 +302,46 @@
 
   function clearWarnings() { layer.querySelectorAll('.scrim, .bar').forEach((n) => n.remove()); }
 
+  const BRAKE_FIELDS = new Set(['card number', 'CVV', 'card expiry', 'one-time code (OTP)', 'PIN', 'bank account']);
+  const BRAKE_MS = 5 * 60e3;
+  function paymentBrake(wall, v, warn, proceed) {
+    const wait = wall.querySelector('.wait'), ask = wall.querySelector('.ask'), msg = wall.querySelector('.bmsg');
+    // the 5 minutes survive a reload of the page
+    const key = 'emcon-brake-' + v.domain;
+    const start = Number(sessionStorage.getItem(key)) || Date.now();
+    sessionStorage.setItem(key, String(start));
+    let stopped = false;
+    const tick = () => {
+      if (stopped || !wall.isConnected) return clearInterval(timer);
+      const left = Math.max(0, BRAKE_MS - (Date.now() - start));
+      if (left > 0) { wait.textContent = `Continue in ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`; return; }
+      clearInterval(timer);
+      wait.disabled = false;
+      wait.textContent = `Continue to ${v.domain} (unsafe)`;
+    };
+    const timer = setInterval(tick, 1000);
+    tick();
+    wait.onclick = () => { if (!wait.disabled) proceed(); };
+    send({ type: 'brake:info' }).then((info) => {
+      if (!info?.connected) return;
+      ask.hidden = false;
+      ask.textContent = `Ask ${info.account} to check it`;
+      ask.onclick = async () => {
+        ask.disabled = true;
+        try {
+          const r = await send({ type: 'brake:request', domain: v.domain, reasons: warn.slice(0, 5).map((c) => `${c.label}: ${c.detail}`) });
+          msg.textContent = `Waiting for ${r.account} to check it on their EMCON dashboard…`;
+          const poll = setInterval(async () => {
+            if (!wall.isConnected) return clearInterval(poll);
+            const s = await send({ type: 'brake:status', id: r.id }).catch(() => null);
+            if (s?.status === 'approved') { clearInterval(poll); stopped = true; msg.textContent = `${r.account} checked it and said you can continue.`; wait.disabled = false; wait.textContent = `Continue to ${v.domain}`; }
+            else if (s?.status === 'denied') { clearInterval(poll); stopped = true; msg.textContent = `${r.account} says: don't pay on this page.${s.note ? ' “' + s.note + '”' : ''}`; wait.disabled = true; wait.textContent = 'Blocked by your family'; }
+          }, 4000);
+        } catch (e) { msg.textContent = e.message; ask.disabled = false; }
+      };
+    }).catch(() => {});
+  }
+
   function showWall(v) {
     mount();
     clearWarnings();
@@ -292,6 +349,8 @@
     const sorted = [...v.checks].sort((a, b) => ORDER[a.status] - ORDER[b.status] || Math.abs(b.pts || 0) - Math.abs(a.pts || 0));
     const warn = sorted.filter((c) => c.status === 'found' || c.status === 'unknown');
     const rest = sorted.length - warn.length;
+    // On a page that asks for money details, continuing is slowed down: the payment brake.
+    const payment = sensitiveFields().some((f) => BRAKE_FIELDS.has(f));
     const wall = document.createElement('div');
     wall.className = 'scrim wall';
     wall.setAttribute('role', 'alertdialog');
@@ -308,10 +367,17 @@
         ${stepsHtml(v)}
         <div class="foot">${rest} other check(s) found nothing. Every reason above is a deterministic check or a signed report, no AI guesses. Save signed proof from the EMCON icon in your toolbar.</div>
       </div>
-      <button class="stay">I understand the risk. Continue to ${esc(v.domain)} (unsafe)</button>
+      ${payment ? `<div class="brake">
+        <h2>Need to pay here anyway?</h2>
+        <p>Scammers rush you. Wait 5 minutes, or ask someone you trust to check this page first.</p>
+        <div class="brow"><button class="ask" hidden>Ask a family member to check it</button><button class="wait" disabled>Continue in 5:00</button></div>
+        <p class="bmsg" role="status"></p>
+      </div>` : `<button class="stay">I understand the risk. Continue to ${esc(v.domain)} (unsafe)</button>`}
     </div>`;
     wall.querySelector('.leave').onclick = () => { history.length > 1 ? history.back() : (location.href = 'about:blank'); };
-    wall.querySelector('.stay').onclick = () => { sessionStorage.setItem('emcon-proceed', v.domain); wall.remove(); };
+    const proceed = () => { sessionStorage.setItem('emcon-proceed', v.domain); wall.remove(); };
+    if (!payment) wall.querySelector('.stay').onclick = proceed;
+    else paymentBrake(wall, v, warn, proceed);
     layer.appendChild(wall);
     document.activeElement?.blur?.(); // keep keystrokes out of the page while the warning is up
     wall.querySelector('.leave').focus();
@@ -322,17 +388,29 @@
     clearWarnings();
     shown = 'caution';
     const found = v.checks.filter((c) => c.status === 'found');
+    const scriptAlarm = found.some((c) => c.id === 'scripts');
     const bar = document.createElement('div');
     bar.className = 'bar';
     bar.setAttribute('role', 'alert');
     bar.innerHTML = `<span class="bi">${ic('alert', 22)}</span>
       <div class="cb-msg"><div class="cb-title">Be careful on ${esc(v.domain)}</div>
         <div class="cb-why">${found.map((c) => `<b>${esc(c.label)}:</b> ${esc(c.detail)}`).join('<br>')}</div>
-        <div class="cb-do">Don't sign in or pay here unless you're sure this is the real site.</div></div>
-      <button>Got it</button>`;
-    bar.querySelector('button').onclick = () => { sessionStorage.setItem('emcon-proceed', v.domain); bar.remove(); };
+        <div class="cb-do">${scriptAlarm ? "Don't type card details here until you're sure this change is legitimate." : "Don't sign in or pay here unless you're sure this is the real site."}</div></div>
+      ${scriptAlarm ? '<button class="trust" title="Only if you know why this script was added">Trust this change</button>' : ''}<button class="got">Got it</button>`;
+    bar.querySelector('.got').onclick = () => { sessionStorage.setItem('emcon-proceed', v.domain); bar.remove(); };
+    const trust = bar.querySelector('.trust');
+    if (trust) trust.onclick = () => { send({ type: 'checkout:accept', url: location.href }).catch(() => {}); bar.remove(); };
     layer.appendChild(bar);
   }
+
+  // Clicking into a card field brings the script alarm back if it was dismissed.
+  document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (!lastVerdict || layer.querySelector('.bar, .scrim') || !el?.matches?.('input')) return;
+    const t = [el.name, el.id, el.placeholder, el.autocomplete, el.getAttribute('aria-label')].filter(Boolean).join(' ').toLowerCase();
+    if (!/^cc-|card|cvv|cvc|expir/.test(t)) return;
+    if (lastVerdict.checks?.some((c) => c.id === 'scripts' && c.status === 'found')) showBar(lastVerdict);
+  }, true);
 
   // The popup can re-run the analysis (e.g. after you paste the message that sent you here).
   chrome.runtime.onMessage.addListener((m) => { if (m?.type === 'emcon:verdict') show(m.verdict); });
@@ -350,7 +428,8 @@
   // Re-analyse when a password/payment field appears later (SPA phishing kits inject the form after load).
   new MutationObserver((muts) => {
     schedule();
-    if (analysed && muts.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches?.('input, form') || n.querySelector?.('input'))))) {
+    // a skimmer is usually injected after load: re-check when a form field or a script appears
+    if (analysed && muts.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches?.('input, form, script[src]') || n.querySelector?.('input'))))) {
       clearTimeout(analyse.t);
       analyse.t = setTimeout(analyse, 800);
     }

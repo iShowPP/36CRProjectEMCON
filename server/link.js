@@ -25,7 +25,7 @@ export function privateIp(ip) {
   return v === '::' || v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80');
 }
 
-async function assertPublic(host) {
+export async function assertPublic(host) {
   if (!HOSTED) return; // local development: the demo links point at localhost
   const h = host.replace(/^\[|\]$/g, '');
   const addrs = net.isIP(h) ? [h] : (await dns.lookup(h, { all: true }).catch(() => [])).map((a) => a.address);

@@ -1,12 +1,17 @@
 import { createApp } from './app.js';
+import { DEMO } from './config.js';
+import { flush } from './store.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const server = await createApp();
 server.listen(PORT, () => {
-  console.log(`\n  EMCON server running\n`);
-  console.log(`  Demo hub ............ http://localhost:${PORT}/`);
-  console.log(`  Ghost sign-in (RP) .. http://localhost:${PORT}/rp.html   (also try http://127.0.0.1:${PORT}/rp.html)`);
-  console.log(`  Provenance studio ... http://localhost:${PORT}/sign.html`);
-  console.log(`  Kestrel Bank vault .. http://localhost:${PORT}/vault.html`);
-  console.log(`  Phishing clone ...... http://127.0.0.1:${PORT}/phish-login.html\n`);
+  console.log(`\n  EMCON server running on http://localhost:${PORT}/`);
+  console.log(`  Sign in ............ http://localhost:${PORT}/login`);
+  console.log(`  Dashboard .......... http://localhost:${PORT}/app`);
+  console.log(`  On real websites ... http://localhost:${PORT}/real.html`);
+  if (DEMO) console.log('  Test site (EMCON_DEMO_SITE=1) is being served from test/site');
+  console.log('');
 });
+
+// Render stops the old instance on every deploy: write pending changes first.
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { await flush(); process.exit(0); });

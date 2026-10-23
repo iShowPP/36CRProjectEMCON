@@ -10,6 +10,7 @@ import { launchBrowser, waitFor, sleep } from '../tools/browser.mjs';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'emcon-browser-test-'));
 process.env.EMCON_DATA = path.join(TMP, 'data');
+process.env.EMCON_DEMO_SITE = '1'; // the made-up test site in test/site (never served in production)
 // Stand-in for the live OpenPhish feed; *.test hostnames are mapped to this machine below.
 process.env.EMCON_FEED_URL = 'data:text/plain,' + encodeURIComponent('https://live-scam-shop.test/login\n');
 const { createApp } = await import('../server/app.js');
@@ -396,6 +397,39 @@ await test('rating a site signs it, verifies you as a person with one Ghost toke
   assert.equal(r.verified.count, 1);
   assert.equal(r.verified.avg, 5);
   assert.equal(r.mine.stars, 5);
+});
+
+console.log('\nCheckout script-change alarm');
+const verdictOn = async (prefix) => { const id = await tabIdFor(prefix); return waitFor(async () => (await ext({ type: 'wot:tab', tabId: id })).result, { what: 'verdict' }); };
+await test('first visit to a payment page records its scripts (no warning)', async () => {
+  const p = await browser.open(L + '/checkout.html');
+  await ready(p);
+  const v = await verdictOn(L + '/checkout.html');
+  const row = v.checks.find((c) => c.id === 'scripts');
+  assert.equal(row.status, 'note');
+  assert.match(row.detail, /First visit to this payment page/);
+  assert.equal((await extensionUi(p)).bar, null);
+});
+await test('a script injected from a new outside domain raises the alarm before card entry, even on a trusted site', async () => {
+  const p = await browser.open(L + '/checkout.html?compromised=1');
+  await ready(p);
+  const ui = await waitFor(async () => { const u = await extensionUi(p); return u.bar && /payment page/.test(u.bar) && u; }, { timeout: 20000, what: 'script alarm' });
+  console.log('      ' + ui.bar.replace(/\s+/g, ' ').slice(0, 220));
+  assert.match(ui.bar, /A script from 127\.0\.0\.1 appeared on this payment page/);
+  assert.match(ui.bar, /Magecart/);
+  assert.match(ui.bar, /Trust this change/);
+  const v = (await ext({ type: 'wot:tab', tabId: await tabIdFor(L + '/checkout.html?compromised=1') })).result;
+  const rep = v.checks.find((c) => c.id === 'reports');
+  assert.ok(!rep || rep.status !== 'good' || /Not counted/.test(rep.detail), 'a good reputation does not cancel the alarm');
+});
+await test('"Trust this change" accepts it; the same scripts later give no warning', async () => {
+  await ext({ type: 'checkout:accept', url: L + '/checkout.html?compromised=1' });
+  const p = await browser.open(L + '/checkout.html?compromised=1&visit=3');
+  await ready(p);
+  await sleep(4000);
+  assert.equal((await extensionUi(p)).bar, null);
+  const v = (await ext({ type: 'wot:tab', tabId: await tabIdFor(L + '/checkout.html?compromised=1&visit=3') })).result;
+  assert.notEqual(v.checks.find((c) => c.id === 'scripts').status, 'found');
 });
 
 await browser.close();

@@ -32,7 +32,7 @@ $('#go').onclick = async () => {
     const s = await send({ type: 'ghost:enroll', dob: $('#dob').value, credId, pin: $('#pin').value });
     const { server } = await send({ type: 'settings:get' });
     $('#msg').className = 'notice role-safe';
-    $('#msg').innerHTML = `Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it at <a href="${server}/rp.html" target="_blank">ShopNorth</a>, a demo site that accepts Ghost sign-in. You can close this tab.`;
+    $('#msg').innerHTML = `Done. You hold ${Object.entries(s.tokens).map(([b, n]) => `${n} "${b}" tokens`).join(' and ')}.<br>Try it now: <a href="${server}/login" target="_blank">sign in to EMCON with Ghost</a>, no email or password. You can close this tab.`;
   } catch (e) {
     $('#msg').textContent = e.message;
     $('#go').disabled = false;
