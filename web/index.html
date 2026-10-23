@@ -9,11 +9,11 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/site.css">
   <style>
-    .hero { max-width: 1180px; margin: 0 auto; padding: 10px 20px 30px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 10px; align-items: center; min-height: 580px; }
-    .hero h1 { font-size: 58px; line-height: 1.03; letter-spacing: -.03em; margin: 12px 0 16px; }
-    .hero canvas { width: 100%; height: 580px; display: block; }
-    .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-    .cta .btn { min-height: 52px; padding: 12px 24px; font-size: 16px; }
+    .hero { max-width: 1180px; margin: 0 auto; padding: 10px 20px 24px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; align-items: center; min-height: 540px; }
+    .hero h1 { font-size: 56px; line-height: 1.05; letter-spacing: -.03em; margin: 12px 0 16px; }
+    .hero canvas { width: 100%; height: 540px; display: block; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+    .cta .btn { min-height: 50px; padding: 12px 24px; font-size: 16px; }
     .trust { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 20px; color: var(--text-2); font-size: 14px; }
     .trust span { display: inline-flex; align-items: center; gap: 6px; }
     .trust svg { color: var(--ok); }
@@ -23,46 +23,50 @@
     .strip .in div:last-child { border-right: 0; }
     .strip b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
     .strip span { color: var(--text-2); font-size: 14px; }
-    section.block { max-width: 1180px; margin: 0 auto; padding: 80px 20px 0; }
-    .eyebrow { font-size: 14px; font-weight: 700; color: var(--primary); }
-    section.block h2 { font-size: 40px; letter-spacing: -.025em; margin: 6px 0 12px; line-height: 1.12; }
-    section.block > p.lead { margin-bottom: 30px; }
+    section.block { max-width: 1180px; margin: 0 auto; padding: 60px 20px 0; }
+    .eyebrow { font-size: 14px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .05em; }
+    section.block h2 { font-size: 38px; letter-spacing: -.025em; margin: 6px 0 12px; line-height: 1.15; }
+    section.block > p.lead { margin-bottom: 28px; }
     .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: h; }
-    .how .card { position: relative; padding-top: 26px; }
+    .how .card { position: relative; padding-top: 28px; }
     .how .card::before { counter-increment: h; content: counter(h); position: absolute; top: -16px; left: 22px; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-weight: 750; }
-    .feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .feat .card h3 { font-size: 18px; margin: 12px 0 6px; }
-    .feat .card p { color: var(--text-2); margin: 0; font-size: 15px; }
-    .fi { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: var(--primary-tint); color: var(--primary); }
-    .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; perspective: 1400px; margin-top: 10px; }
+    .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; perspective: 1400px; margin-top: 32px; }
     .shots figure { margin: 0; transform: rotateY(var(--ry, 0deg)) rotateX(5deg) translateZ(0); transition: transform .5s cubic-bezier(.2,.7,.2,1); }
     .shots figure:hover { transform: rotateY(0) rotateX(0) translateY(-6px); }
-    .shots img { width: 100%; border-radius: 14px; border: 1px solid var(--border); box-shadow: 0 30px 60px rgba(16,24,40,.2); display: block; }
-    .shots figcaption { margin-top: 12px; font-size: 15px; color: var(--text-2); }
-    .shots figcaption b { color: var(--text); display: block; }
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    .split .card { padding: 28px; }
-    .split h3 { font-size: 22px; margin: 12px 0 8px; }
-    .split ul { padding-left: 18px; color: var(--text-2); margin: 10px 0 18px; }
-    .split li { margin: 6px 0; }
+    .shots img { width: 100%; border-radius: 14px; border: 1px solid var(--border); box-shadow: 0 20px 48px rgba(16,24,40,.2); display: block; }
+    .shots figcaption { margin-top: 12px; font-size: 14.5px; color: var(--text-2); }
+    .shots figcaption b { color: var(--text); display: block; font-size: 15px; margin-bottom: 2px; }
+    .feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feat .card { padding: 24px; display: flex; flex-direction: column; }
+    .feat .card h3 { font-size: 18px; margin: 14px 0 8px; }
+    .feat .card p { color: var(--text-2); margin: 0; font-size: 14.5px; line-height: 1.55; }
+    .fi { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--primary-tint); color: var(--primary); flex: none; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .split .card { padding: 30px; }
+    .split h3 { font-size: 22px; margin: 14px 0 8px; }
+    .split ul { padding-left: 18px; color: var(--text-2); margin: 12px 0 22px; }
+    .split li { margin: 8px 0; }
     .cmp { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
-    .cmp th, .cmp td { padding: 14px 16px; text-align: center; font-size: 15px; }
+    .cmp th, .cmp td { padding: 13px 16px; text-align: center; font-size: 14.5px; }
     .cmp th:first-child, .cmp td:first-child { text-align: left; }
     .cmp td.y { color: var(--ok); font-weight: 700; } .cmp td.n { color: var(--text-3); }
     .cmp .us { background: var(--primary-tint); }
-    .billing-toggle { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 18px; }
-    .billing-toggle button { border: 0; min-height: 36px; border-radius: 999px; background: transparent; font-size: 14px; }
-    .billing-toggle button.on { background: var(--primary); color: var(--on-primary); }
-    details.faq { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 20px; margin-bottom: 10px; }
-    details.faq summary { cursor: pointer; padding: 16px 0; font-weight: 650; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    .billing-toggle { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 20px; }
+    .billing-toggle button { border: 0; min-height: 36px; padding: 0 16px; border-radius: 999px; background: transparent; font-size: 14px; cursor: pointer; color: var(--text-2); }
+    .billing-toggle button.on { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+    details.faq { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 22px; margin-bottom: 12px; box-shadow: var(--shadow); }
+    details.faq summary { cursor: pointer; padding: 18px 0; font-weight: 650; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
     details.faq summary::after { content: "+"; font-size: 22px; line-height: 1; color: var(--text-3); }
     details.faq[open] summary::after { content: "–"; }
-    details.faq p { margin: 0 0 16px; color: var(--text-2); }
-    .final { margin: 90px auto 0; max-width: 1180px; padding: 0 20px; }
-    .final .in { position: relative; overflow: hidden; border-radius: 22px; background: #0b1530; color: #fff; padding: 52px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; min-height: 300px; }
+    details.faq p { margin: 0 0 18px; color: var(--text-2); font-size: 15px; line-height: 1.6; }
+    .final { margin: 80px auto 0; max-width: 1180px; padding: 0 20px; }
+    .final .in { position: relative; overflow: hidden; border-radius: 22px; background: #0b1530; color: #fff; padding: 52px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; min-height: 300px; box-shadow: 0 24px 60px rgba(11,21,48,.35); }
     .final h2 { color: #fff; font-size: 38px; margin: 0 0 10px; letter-spacing: -.02em; }
-    .final p { color: #b8c3dd; font-size: 17px; }
-    .final canvas { position: absolute; right: 0; top: 0; width: 55%; height: 100%; }
+    .final p { color: #b8c3dd; font-size: 17px; margin: 0 0 18px; }
+    .final canvas { position: absolute; right: 0; top: 0; width: 55%; height: 100%; pointer-events: none; }
+    .final-badges { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; font-size: 13.5px; color: #9bb0dc; }
+    .final-badges span { display: inline-flex; align-items: center; gap: 6px; }
+    .final-badges svg { color: var(--ok); }
     .rv .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s, transform .6s; }
     .rv .reveal.in { opacity: 1; transform: none; }
     @media (prefers-reduced-motion: reduce) { .rv .reveal { opacity: 1; transform: none; transition: none; } }
@@ -77,7 +81,7 @@
 <body>
   <header class="site-top">
     <a class="brand" href="/"><img src="/emcon-mark.svg" alt="">EMCON</a>
-    <nav><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="/real.html">See it live</a><span id="authNav"><a href="/login">Log in</a><a class="btn primary" href="/signup">Get started free</a></span></nav>
+    <nav><a href="#features">Features</a><a href="#how">How it works</a><a href="#compare">Compare</a><a href="#audiences">Who it's for</a><a href="#pricing">Pricing</a><a href="/real.html">See it live</a><span id="authNav"><a href="/login">Log in</a><a class="btn primary" href="/signup">Get started free</a></span></nav>
   </header>
 
   <section class="hero">
@@ -92,9 +96,9 @@
   </section>
 
   <div class="strip reveal"><div class="in">
-    <div><b id="feedCount">270+</b><span>live phishing sites blocked right now</span></div>
+    <div><b id="feedCount">280+</b><span>live phishing sites blocked right now</span></div>
     <div><b>0</b><span>messages read by EMCON, ever</span></div>
-    <div><b>7</b><span>protections in one extension</span></div>
+    <div><b>9</b><span>protections in one extension</span></div>
     <div><b>100%</b><span>of warnings come with their evidence</span></div>
   </div></div>
 
@@ -107,52 +111,60 @@
       <div class="card"><h3>EMCON follows the trail</h3><p class="muted">Short links, redirects, look-alike addresses, brand-new domains and live scam reports, checked before you type anything.</p></div>
       <div class="card"><h3>You see the proof</h3><p class="muted">A red "Back to safety" page with every reason in plain words, and a signed receipt you can show your bank or the police.</p></div>
     </div>
-  </section>
-
-  <section class="block">
     <div class="shots reveal">
-      <figure style="--ry:12deg"><img src="/img/popup-verdict.png" alt="EMCON popup: very likely a scam, with reasons" loading="lazy"><figcaption><b>A clear answer, with reasons</b>One status in plain words, then the evidence.</figcaption></figure>
+      <figure style="--ry:10deg"><img src="/img/popup-verdict.png" alt="EMCON popup: very likely a scam, with reasons" loading="lazy"><figcaption><b>A clear answer, with reasons</b>One status in plain words, then the evidence.</figcaption></figure>
       <figure><img src="/img/block-page.png" alt="EMCON red block page with Back to safety" loading="lazy"><figcaption><b>Back to safety</b>Dangerous pages are stopped before you type.</figcaption></figure>
-      <figure style="--ry:-12deg"><img src="/img/popup-path.png" alt="The path to a scam page, drawn like parcel tracking" loading="lazy"><figcaption><b>How you got there</b>Message, short link, redirect, fake page.</figcaption></figure>
+      <figure style="--ry:-10deg"><img src="/img/popup-path.png" alt="The path to a scam page, drawn like parcel tracking" loading="lazy"><figcaption><b>How you got there</b>Message, short link, redirect, fake page.</figcaption></figure>
     </div>
   </section>
 
   <section class="block" id="features">
     <div class="eyebrow">Features</div>
-    <h2>Seven protections. One quiet extension.</h2>
+    <h2>Nine protections. One quiet extension.</h2>
     <p class="lead">It stays out of your way on normal sites and speaks up only with evidence.</p>
     <div class="feat reveal">
-      <div class="card"><span class="fi" data-i="shield"></span><h3>Phishing and look-alikes</h3><p>Blocks copies of real login pages, addresses like paypa1-secure.com and sites in the live phishing feed.</p></div>
-      <div class="card"><span class="fi" data-i="link"></span><h3>Check a message</h3><p>Paste an SMS or WhatsApp message. EMCON follows the link without opening it and highlights the scam words.</p></div>
-      <div class="card"><span class="fi" data-i="users"></span><h3>Family protection</h3><p>Connect your parents' browsers and get an alert when EMCON blocks a scam for them. Never their browsing.</p></div>
-      <div class="card"><span class="fi" data-i="bell"></span><h3>Privacy promises</h3><p>Names every company tracking you, tells sites "do not sell or share", and checks if tracking stops when you say no.</p></div>
-      <div class="card"><span class="fi" data-i="key"></span><h3>Signed evidence</h3><p>Save a receipt of any warning, signed and timestamped, that anyone can verify.</p></div>
-      <div class="card"><span class="fi" data-i="ghost"></span><h3>Photos and Ghost sign-in</h3><p>See who signed a photo and whether it was edited. Sign up on sites without giving your email.</p></div>
+      <div class="card"><span class="fi" data-i="shield"></span><h3>Phishing & look-alikes</h3><p>Blocks copies of real login pages, typo addresses like paypa1-secure.com and sites in the live phishing feed.</p></div>
+      <div class="card"><span class="fi" data-i="link"></span><h3>Check a message</h3><p>Paste an SMS or WhatsApp link. EMCON traces redirects server-side without opening the page, highlighting scam lures.</p></div>
+      <div class="card"><span class="fi" data-i="card"></span><h3>Real-world payment brake</h3><p>Enforces a 5-minute cooling-off timer and live family approval whenever a risky page asks for card, PIN, or OTP details.</p></div>
+      <div class="card"><span class="fi" data-i="code"></span><h3>Checkout skimmer alarm</h3><p>Warns before card input if an unfamiliar outside domain script (Magecart) appears on a shopping checkout page.</p></div>
+      <div class="card"><span class="fi" data-i="users"></span><h3>Family protection</h3><p>Connect your parents' and kids' browsers with a 6-digit code. Get alerts when scams are blocked, never their browsing.</p></div>
+      <div class="card"><span class="fi" data-i="bell"></span><h3>Privacy promises</h3><p>Sends Global Privacy Control (Sec-GPC) and audits whether tracking actually stops after you click "Reject all".</p></div>
+      <div class="card"><span class="fi" data-i="image"></span><h3>Photo signing & C2PA</h3><p>Shows who signed a photo and whether pixels were edited. Domain-verified publishers can sign authentic photos.</p></div>
+      <div class="card"><span class="fi" data-i="ghost"></span><h3>Ghost zero-knowledge login</h3><p>Sign up and sign in using blind humanity tokens. Prove you're a real adult without email, password, or phone.</p></div>
+      <div class="card"><span class="fi" data-i="key"></span><h3>Signed evidence receipts</h3><p>Export cryptographic, timestamped receipts of any check or warning that anyone can independently verify.</p></div>
     </div>
   </section>
 
   <section class="block" id="compare">
     <div class="eyebrow">Why EMCON</div>
     <h2>Others give you a verdict. EMCON gives you the reasons.</h2>
-    <div class="reveal" style="margin-top:24px;overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="cmp" style="min-width:560px">
+    <p class="lead">Traditional security tools give opaque percentage scores or silent blacklists. EMCON provides deterministic, verifiable evidence for every decision.</p>
+    <div class="reveal" style="margin-top:20px;overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="cmp" style="min-width:680px">
       <thead><tr><th></th><th class="us">EMCON</th><th>Browser blocklists</th><th>AI scam checkers</th><th>Bank SMS alerts</th></tr></thead>
       <tbody>
-        <tr><td>Shows why, with evidence</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Shows why, with deterministic evidence</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
         <tr><td>Follows the whole path from the message</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
         <tr><td>Catches brand-new look-alike sites</td><td class="us y">✓</td><td class="n">–</td><td class="y">✓</td><td class="n">–</td></tr>
-        <tr><td>Never reads your messages</td><td class="us y">✓</td><td class="y">✓</td><td class="n">–</td><td class="y">✓</td></tr>
-        <tr><td>Protects family members</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
-        <tr><td>Signed proof you can share</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Payment brake with cooling-off & family approval</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Checkout skimmer (Magecart) alarm</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Anti-fingerprinting before page scripts run</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Audits privacy promises & cookie rejection</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Zero-knowledge Ghost sign-in</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
+        <tr><td>Never reads your private messages</td><td class="us y">✓</td><td class="y">✓</td><td class="n">–</td><td class="y">✓</td></tr>
+        <tr><td>Signed cryptographic proof you can share</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
       </tbody>
     </table></div>
   </section>
 
-  <section class="block">
+  <section class="block" id="audiences">
+    <div class="eyebrow">Who it's for</div>
+    <h2>Built for families at home and teams at work.</h2>
+    <p class="lead">Protect vulnerable family members from urgent payment scams, or automate link verification in company helpdesks.</p>
     <div class="split reveal">
       <div class="card"><span class="fi" data-i="users"></span><h3>For families</h3><p class="muted">Scammers target the people least likely to spot them. Protect them from your own dashboard.</p>
-        <ul><li>Connect up to 8 browsers with a 6-digit code</li><li>Get an alert whenever a scam is blocked for them</li><li>They keep their privacy: counts, never sites</li></ul><a class="btn primary" href="/signup">Protect your family</a></div>
+        <ul><li>Connect up to 8 browsers with a 6-digit code</li><li>Get an alert whenever a scam is blocked for them</li><li>Payment brake lets you check and approve risky transfers</li><li>They keep their privacy: counts, never browsing history</li></ul><a class="btn primary" href="/signup?plan=family">Protect your family</a></div>
       <div class="card"><span class="fi" data-i="code"></span><h3>For businesses</h3><p class="muted">Check links in support chats, SMS gateways and helpdesks with the same evidence engine.</p>
-        <ul><li>Link-check API: verdict, path and reasons in about a second</li><li>Up to 20,000 checks a day</li><li>Signed receipts for incident reports</li></ul><a class="btn" href="/signup?plan=business">Get an API key</a></div>
+        <ul><li>Link-check API: verdict, path and reasons in ~1 second</li><li>Up to 20,000 checks a day with rate-limit controls</li><li>Publisher photo signing with domain verification</li><li>Signed cryptographic receipts for security incident reports</li></ul><a class="btn" href="/signup?plan=business">Get an API key</a></div>
     </div>
   </section>
 
@@ -164,25 +176,37 @@
       <div class="plan-card"><h3>Free</h3><div class="price" data-m="0" data-y="0">₹0<small> / month</small></div><div class="small muted">For you, on up to 2 browsers</div>
         <ul><li>Scam, phishing and look-alike protection</li><li>Message checks and photo labels</li><li>Privacy promise monitor</li><li>50 API checks a day</li></ul><a class="btn" href="/signup">Get started</a></div>
       <div class="plan-card featured"><h3>Family<span class="badge-pop">Most popular</span></h3><div class="price" data-m="149" data-y="1490">₹149<small> / month</small></div><div class="small muted">Protect parents and kids</div>
-        <ul><li>Everything in Free</li><li>8 browsers for the whole family</li><li>Alerts when a scam is blocked for them</li><li>500 API checks a day</li></ul><a class="btn primary" href="/signup?plan=family">Start with Family</a></div>
+        <ul><li>Everything in Free</li><li>8 browsers for the whole family</li><li>Alerts when a scam is blocked for them</li><li>Real-time payment brake approvals</li><li>500 API checks a day</li></ul><a class="btn primary" href="/signup?plan=family">Start with Family</a></div>
       <div class="plan-card"><h3>Business</h3><div class="price" data-m="2999" data-y="29990">₹2,999<small> / month</small></div><div class="small muted">API, team browsers, evidence</div>
-        <ul><li>Everything in Family</li><li>100 team browsers</li><li>20,000 API checks a day</li><li>Signed receipts for incidents</li></ul><a class="btn" href="/signup?plan=business">Start with Business</a></div>
+        <ul><li>Everything in Family</li><li>100 team browsers</li><li>20,000 API checks a day</li><li>Publisher photo signing keys</li><li>Signed receipts for incidents</li></ul><a class="btn" href="/signup?plan=business">Start with Business</a></div>
     </div>
-    <p class="small muted" style="margin-top:12px">Prices in Indian rupees, including GST. This is a hackathon build: paid plans run in demo mode with no charge.</p>
+    <p class="small muted" style="margin-top:14px">Prices in Indian rupees, including GST. This is a hackathon build: paid plans run in demo mode with no charge.</p>
   </section>
 
-  <section class="block" id="faq" style="max-width:820px">
+  <section class="block" id="faq" style="max-width:840px">
     <div class="eyebrow">Questions</div>
     <h2>Good questions to ask a security product.</h2>
     <details class="faq"><summary>Does EMCON read my messages or browsing history?</summary><p>No. Messages you paste stay on your computer; only the link is sent to be followed. Phishing lookups send a 5-character hash prefix, not the address. Family dashboards show counts, never sites.</p></details>
+    <details class="faq"><summary>What is the payment brake and how does it protect my family?</summary><p>When you or a connected family member visits a payment page asking for card, OTP, PIN or bank details that EMCON flags, EMCON enforces a mandatory 5-minute cooling-off period to break scam urgency. The user can also click "Ask family member to check it"; the request appears instantly on your dashboard with EMCON's evidence, letting you approve or stop the payment.</p></details>
+    <details class="faq"><summary>How does the checkout script skimmer (Magecart) alarm work?</summary><p>On your first visit to any checkout or payment page, EMCON records the scripts loaded. If an unauthorized third-party script domain is subsequently injected into the page, EMCON alerts you before you enter card details, protecting you from credit card skimming attacks.</p></details>
     <details class="faq"><summary>How is this different from AI scam detectors?</summary><p>AI detectors give a score you have to trust. EMCON shows every check: who reported a site, which brand it copies, which redirects you passed through. You can verify each one yourself.</p></details>
+    <details class="faq"><summary>How does publisher photo signing work?</summary><p>Newsrooms and publishers verify domain ownership by placing a small verification token at <code>/.well-known/emcon-publisher.txt</code> or via a DNS TXT record. Once verified, photos signed in the dashboard display as "Verified · [domain]" to all EMCON users. If someone strips metadata, EMCON's visual fingerprint matching recovers the provenance.</p></details>
     <details class="faq"><summary>What if EMCON gets it wrong?</summary><p>Every warning lists its reasons, so a mistake is easy to spot. You can continue anyway, and vouch for a site you trust; your vouch counts for people who trust you.</p></details>
     <details class="faq"><summary>What happens if I forget my password?</summary><p>Use the recovery key you saved at sign-up. Nobody at EMCON can reset your account, so nobody can be tricked into handing it over.</p></details>
     <details class="faq"><summary>Which browsers does it work in?</summary><p>Chrome, Edge and Brave on Windows, Mac and Linux. Mobile protection is on the roadmap.</p></details>
   </section>
 
   <section class="final reveal"><div class="in">
-    <div style="position:relative;z-index:1"><h2>Stop the next scam before it starts.</h2><p>Install EMCON in two minutes. Free for personal use.</p><div class="cta"><a class="btn primary" href="/signup">Get started free</a><a class="btn" href="https://github.com/iShowPP/36CRProjectEMCON/releases/latest" style="background:transparent;color:#fff;border-color:#4b5b85">Download the extension</a></div></div>
+    <div style="position:relative;z-index:1">
+      <h2>Stop the next scam before it starts.</h2>
+      <p>Install EMCON in two minutes. Free for personal use on Chrome, Edge and Brave.</p>
+      <div class="cta"><a class="btn primary" href="/signup">Get started free</a><a class="btn" href="https://github.com/iShowPP/36CRProjectEMCON/releases/latest" style="background:transparent;color:#fff;border-color:#4b5b85">Download the extension</a></div>
+      <div class="final-badges">
+        <span><i data-i="check"></i>No credit card required</span>
+        <span><i data-i="check"></i>Zero-knowledge privacy</span>
+        <span><i data-i="check"></i>Open source</span>
+      </div>
+    </div>
     <canvas id="scene2" aria-hidden="true"></canvas>
   </div></section>
 
@@ -203,8 +227,8 @@
     }));
     const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
     document.documentElement.classList.add('rv');
-    $('.reveal').forEach((el) => io.observe(el));
-    setTimeout(() => $('.reveal').forEach((el) => el.classList.add('in')), 3000); // never leave content hidden
+    $$('.reveal').forEach((el) => io.observe(el));
+    setTimeout(() => $$('.reveal').forEach((el) => el.classList.add('in')), 1000); // never leave content hidden
   </script>
 </body>
 </html>
