@@ -1,6 +1,6 @@
 {
   "name": "emcon",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "EMCON — four non-AI shields against tracking, fake media, payment scams and phishing.",
   "type": "module",
   "private": true,

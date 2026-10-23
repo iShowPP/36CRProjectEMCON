@@ -10,6 +10,7 @@ import wot from './wot.js';
 import timestamp from './timestamp.js';
 import link from './link.js';
 import accounts from './accounts.js';
+import ratings from './ratings.js';
 import { publicUrls } from './config.js';
 
 // Demo "link shortener" hops for the scam-chain demo: /s/qk50 -> /r?to=/claim.html -> /claim.html.
@@ -31,7 +32,7 @@ export async function createApp() {
     const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
     routes.push({ method, re, keys, handler });
   };
-  for (const mod of [issuer, rp, prov, vault, wot, timestamp, link, accounts]) await mod(route);
+  for (const mod of [issuer, rp, prov, vault, wot, timestamp, link, accounts, ratings]) await mod(route);
   route('GET', '/api/config', ({ origin }) => publicUrls(origin));
 
   const server = http.createServer(async (req, res) => {

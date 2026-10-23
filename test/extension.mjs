@@ -350,6 +350,54 @@ await test('receipt page renders the evidence inside the extension', async () =>
   assert.match(text, /countersigned by the EMCON server/);
 });
 
+console.log('\nTrust by QR code + community ratings');
+const qrlib = await import('../extension/lib/qrtrust.js');
+const ut = await import('../extension/lib/util.js');
+const ashaKey = await ut.ed25519FromSeed(ut.randomBytes(32));
+const asha = { privateKey: ashaKey.privateKey, did: ut.didKeyFromPub(ashaKey.pub) };
+const QR_SITE = `http://qrshop.test:${PORT}`;
+await test('a vouch from a stranger is refused; after scanning their contact code it counts in the site check', async () => {
+  const vouch = qrlib.encodeQr(await qrlib.makeAttestation(asha, 'qrshop.test', 'safe'));
+  const refused = await ext({ type: 'qr:import', text: vouch });
+  assert.match(refused.error, /not in your contacts/);
+  const contact = (await ext({ type: 'qr:import', text: qrlib.encodeQr(await qrlib.makeContact(asha, 'Asha')) })).result;
+  assert.equal(contact.kind, 'contact');
+  assert.equal(contact.nickname, 'Asha');
+  await ext({ type: 'wot:trust', did: contact.did, label: 'Asha', weight: 1, publish: false });
+  const ok = (await ext({ type: 'qr:import', text: vouch })).result;
+  assert.equal(ok.from, 'Asha');
+  assert.equal(ok.stored, true);
+  const p = await browser.open(QR_SITE + '/terms');
+  await ready(p);
+  const id = await tabIdFor(QR_SITE);
+  const v = await waitFor(async () => (await ext({ type: 'wot:tab', tabId: id })).result, { what: 'verdict' });
+  const rep = v.checks.find((c) => c.id === 'reports');
+  assert.equal(rep.status, 'good');
+  assert.match(rep.detail, /Asha/);
+});
+await test('a QR code with one character changed is rejected', async () => {
+  const text = qrlib.encodeQr(await qrlib.makeAttestation(asha, 'qrshop.test', 'scam'));
+  const i = text.length - 12;
+  const r = await ext({ type: 'qr:import', text: text.slice(0, i) + (text[i] === 'A' ? 'B' : 'A') + text.slice(i + 1) });
+  assert.ok(r.error, 'tampered code must fail');
+});
+await test('the QR page draws a scannable contact code', async () => {
+  const pg = await browser.open(`chrome-extension://${browser.extensionId}/pages/qr.html`);
+  await waitFor(() => pg.eval('typeof window.qrcode === "function" && typeof window.jsQR === "function"'), { what: 'QR libraries' });
+  await pg.eval("document.querySelector('#nick').value = 'Priya'; document.querySelector('#mkContact').click()");
+  const text = await waitFor(() => pg.eval("document.querySelector('#contactOut .payload')?.textContent"), { what: 'contact code' });
+  // read it back with the scanner from the rendered SVG
+  const decoded = await pg.eval(`new Promise((res) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 400; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 400, 400); g.drawImage(img, 0, 0, 400, 400); res(window.jsQR(g.getImageData(0, 0, 400, 400).data, 400, 400)?.data); }; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(document.querySelector('.qrbox svg').outerHTML); })`);
+  assert.equal(decoded, text, 'the drawn QR scans back to the same text');
+});
+await test('rating a site signs it, verifies you as a person with one Ghost token, and shows in the check', async () => {
+  const r = (await ext({ type: 'rate:submit', domain: 'qrshop.test', stars: 5, tags: ['good support'] })).result;
+  assert.equal(r.raterVerified, true);
+  assert.equal(r.verified.count, 1);
+  assert.equal(r.verified.avg, 5);
+  assert.equal(r.mine.stars, 5);
+});
+
 await browser.close();
 server.close();
 probe.close();

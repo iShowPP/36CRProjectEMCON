@@ -99,12 +99,18 @@ This starts the server on `:8787` and opens a browser window with the EMCON exte
 ### Tests
 
 ```bash
-npm test               # 52 API tests against the live server
-npm run test:browser   # 25 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts
+npm test               # 57 API tests against the live server
+npm run test:browser   # 29 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts
 npm run test:all       # both
 ```
 
 Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
+
+## Trust by QR code, and community ratings
+
+**QR codes (EMCON → More → Share trust by QR code).** Friends swap *contact codes* once, in person (a self-signed did:key, so the key is really theirs). After that, a friend's *vouch code* ("I used shop.com safely") or *warning code* ("this is a scam") counts in your checks, with no server in the middle. Codes are compact signed JSON (about 330 characters, QR level M), bound to one domain, with a nonce and a 90-day expiry; a newer code from the same person replaces the old one. A code from someone who isn't in your contacts is refused (strangers can't vote), and changing one character breaks the signature. Scan with the camera, upload a photo or screenshot, or paste the text. Drawing uses qrcode-generator (MIT) and scanning uses jsQR (Apache-2.0), both in `extension/vendor`.
+
+**Community ratings (popup → This site → Community rating).** 1–5 stars plus plain tags ("never delivered", "asked for OTP or PIN"…), signed with your EMCON key, one per person per site. A rater counts as a *verified person* only after spending one blind humanity token (Ghost), so a bot farm can't mint thousands of reviewers; unverified ratings are shown but not counted. Lookups use the same 5-character hash prefix as scam reports. Ratings feed the site check with small weight (a crowd can be wrong): 3+ verified ratings averaging ≤2 add a finding, ≥4 a good sign. Ratings from people in your trust network are listed by name.
 
 ## The product site (SaaS)
 
@@ -253,7 +259,7 @@ server/  (Node 22+, zero dependencies)
 web/        demo pages (overview, ShopNorth, Provenance Studio, feed, vault, guardian, bank login, phishing clone,
             prize SMS + claim page, newspaper, receipt verifier, real-internet guide)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (52 API tests) · extension.mjs (25 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
+test/       e2e.mjs (57 API tests) · extension.mjs (29 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
 scripts/    demo.mjs: the one-command demo launcher (npm run demo / start-demo.cmd)

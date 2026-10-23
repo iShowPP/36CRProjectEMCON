@@ -28,6 +28,7 @@ function showView(name) {
 document.querySelectorAll('nav.tabs button').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 document.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => showView(b.dataset.view)));
 document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => showView(null)));
+document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('pages/' + b.dataset.open) })));
 
 // ---------- This site ----------
 const empty = (title, text, ic = 'shield') => `<div class="empty"><span class="dot-icon role-neutral">${icon(ic, 24)}</span><h2>${esc(title)}</h2><p class="small" style="margin-top:4px">${esc(text)}</p></div>`;
@@ -66,6 +67,37 @@ async function renderTiles() {
 }
 renderTiles();
 
+// ---------- community rating ----------
+const starStr = (n) => '★★★★★'.slice(0, Math.round(n)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n));
+async function renderRating(r, msg = '') {
+  if (!domain) { $('#rating').innerHTML = '<p class="small muted" style="margin:0">Open a website to see and give ratings.</p>'; return; }
+  try { r ||= await send({ type: 'rate:get', domain }); } catch (e) { $('#rating').innerHTML = `<p class="small muted" style="margin:0">Ratings unavailable: ${esc(e.message)}</p>`; return; }
+  const v = r.verified;
+  let pick = r.mine?.stars || 0;
+  const picked = new Set(r.mine?.tags || []);
+  $('#rating').innerHTML = `
+    ${v.count ? `<div class="row" style="gap:10px"><span class="stars big">${starStr(v.avg)}</span><b style="font-size:20px">${v.avg}</b><span class="small muted">from ${v.count} verified ${v.count === 1 ? 'person' : 'people'}</span></div>
+      ${v.tags.length ? `<div class="tagpick" style="margin:8px 0 0">${v.tags.slice(0, 4).map(([t, n]) => `<span class="pill role-${/fake|never|OTP|imperson|threat/.test(t) ? 'danger' : 'safe'}">${esc(t)} · ${n}</span>`).join('')}</div>` : ''}`
+      : `<p class="small muted" style="margin:0">No verified ratings yet${r.unverified ? ` (${r.unverified} unverified not counted)` : ''}. Be the first.</p>`}
+    ${r.network.length ? `<div class="small" style="margin-top:8px">${r.network.map((x) => `<div><b>${esc(x.who)}</b> gave <span class="stars">${starStr(x.stars)}</span>${x.tags.length ? ` · ${esc(x.tags.join(', '))}` : ''}</div>`).join('')}</div>` : ''}
+    <hr style="margin:12px 0">
+    <div class="label">${r.mine ? 'Your rating (change it any time)' : 'Have you used this site? Rate it'}</div>
+    <div class="rate-pick">${[1, 2, 3, 4, 5].map((n) => `<button data-star="${n}" class="${n <= pick ? 'on' : ''}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}</div>
+    <div class="tagpick">${r.tags.map((t) => `<button data-tag="${esc(t)}" class="${picked.has(t) ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>
+    <button class="primary block" id="rateGo" ${pick ? '' : 'disabled'}>${r.mine ? 'Update my rating' : 'Submit rating'}</button>
+    <p class="tiny faint" style="margin:6px 0 0">${msg || (r.raterVerified ? 'You are a verified rater: your rating counts.' : 'Signed with your EMCON key. It counts once you are a verified person (set up Ghost; one token proves it).')}</p>`;
+  document.querySelectorAll('[data-star]').forEach((b) => (b.onclick = () => { pick = Number(b.dataset.star); document.querySelectorAll('[data-star]').forEach((x) => x.classList.toggle('on', Number(x.dataset.star) <= pick)); $('#rateGo').disabled = false; }));
+  document.querySelectorAll('[data-tag]').forEach((b) => (b.onclick = () => { picked.has(b.dataset.tag) ? picked.delete(b.dataset.tag) : picked.size < 4 && picked.add(b.dataset.tag); b.classList.toggle('on', picked.has(b.dataset.tag)); }));
+  $('#rateGo').onclick = async () => {
+    $('#rateGo').disabled = true;
+    try {
+      const res = await send({ type: 'rate:submit', domain, stars: pick, tags: [...picked] });
+      renderRating(res, res.raterVerified ? 'Thanks. Your rating counts as a verified person.' : 'Saved. Set up Ghost to make it count as a verified person.');
+    } catch (e) { $('#rateGo').disabled = false; $('#rating').querySelector('.tiny').textContent = e.message; }
+  };
+}
+renderRating();
+
 $('#msgGo').onclick = async () => {
   $('#msgOut').textContent = 'Checking…';
   try {
@@ -79,7 +111,8 @@ async function attest(kind) {
   if (!domain) return;
   try {
     await send({ type: 'wot:attest', domain, verdict: kind, transacted: kind === 'trusted' });
-    $('#attMsg').innerHTML = `<span class="ok">Thanks.</span> Your ${kind === 'scam' ? 'report' : 'vouch'} is signed with your key and shared with people who trust you.`;
+    $('#attMsg').innerHTML = `<span class="ok">Thanks.</span> Your ${kind === 'scam' ? 'report' : 'vouch'} is signed with your key and shared with people who trust you. <button class="sm" id="attQr" style="margin-top:6px">Share it as a QR code</button>`;
+    $('#attQr').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL(`pages/qr.html?domain=${encodeURIComponent(domain)}&tab=vouch`) });
   } catch (e) { $('#attMsg').textContent = e.message; }
 }
 $('#attGood').onclick = () => attest('trusted');

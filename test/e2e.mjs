@@ -418,6 +418,64 @@ await test('when hosted, link check refuses private-network targets (no SSRF)', 
 });
 side.close();
 
+console.log('\nTrust by QR code');
+const qr = await import('../extension/lib/qrtrust.js');
+const keyOf = async () => { const k = await ed25519FromSeed(randomBytes(32)); return { privateKey: k.privateKey, did: didKeyFromPub(k.pub) }; };
+const asha = await keyOf();
+await test('contact and attestation QRs round-trip, stay small, and verify', async () => {
+  const c = await qr.verifyQr(qr.decodeQr(qr.encodeQr(await qr.makeContact(asha, 'Asha'))));
+  assert.equal(c.kind, 'contact'); assert.equal(c.did, asha.did); assert.equal(c.nickname, 'Asha');
+  const text = qr.encodeQr(await qr.makeAttestation(asha, 'www.Shop.example.com', 'safe'));
+  assert.ok(text.length < 600, `attestation QR payload is ${text.length} chars`);
+  const a = await qr.verifyQr(qr.decodeQr(text));
+  assert.equal(a.domain, 'shop.example.com'); assert.equal(a.claim, 'safe'); assert.equal(a.issuer, asha.did);
+});
+await test('changing one character, swapping the domain, or an expired vouch is rejected', async () => {
+  const p = await qr.makeAttestation(asha, 'shop.example.com', 'safe');
+  await assert.rejects(qr.verifyQr({ ...p, d: 'evil.example.com' }), /Signature check failed/);
+  await assert.rejects(qr.verifyQr({ ...p, c: 'x' }), /Signature check failed/);
+  const text = qr.encodeQr(p);
+  const i = qr.PREFIX.length + 20;
+  const tampered = text.slice(0, i) + (text[i] === 'A' ? 'B' : 'A') + text.slice(i + 1);
+  await assert.rejects(async () => qr.verifyQr(qr.decodeQr(tampered)));
+  const old = await qr.makeAttestation(asha, 'shop.example.com', 'scam', -1);
+  await assert.rejects(qr.verifyQr(old), /expired/);
+  await assert.rejects(async () => qr.decodeQr('hello'), /isn't an EMCON QR/);
+});
+
+console.log('\nCrowdsourced ratings');
+const { sha256: sha } = await import('../extension/lib/util.js');
+const rateBody = async (k, domain, stars, tags = [], iat = Date.now()) => ({ did: k.did, domain, stars, tags, iat, sig: toB64u(await ed25519Sign(k.privateKey, `EMCON-RATE-v1|${k.did}|${domain}|${stars}|${tags.join(',')}|${iat}`)) });
+const lookup = async (domain) => (await api('/api/ratings?prefix=' + toHex(await sha(domain)).slice(0, 5))).ratings.filter((r) => r.domain === domain);
+await test('ratings must be signed by the rater, fresh, and on a 1–5 scale', async () => {
+  const b = await rateBody(asha, 'shop.example.com', 5);
+  assert.equal((await api('/api/ratings', { method: 'POST', body: { ...b, stars: 1 } })).status, 401, 'stars changed after signing');
+  assert.equal((await api('/api/ratings', { method: 'POST', body: await rateBody(asha, 'shop.example.com', 5, [], Date.now() - 3600e3) })).status, 400, 'stale');
+  assert.equal((await api('/api/ratings', { method: 'POST', body: await rateBody(asha, 'shop.example.com', 9) })).status, 400);
+  const ok = await api('/api/ratings', { method: 'POST', body: b });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.verifiedRater, false, 'not a verified person yet');
+});
+await test('spending one humanity token makes a rater a verified person; the same token can\'t verify a second key', async () => {
+  const { enrollmentId: eid } = await api('/api/issuer/enroll', { method: 'POST', body: { dob: '1985-03-03' } });
+  const t = randomBytes(32), bl = await brsa.blind(t, pub18);
+  const res = await api('/api/issuer/issue', { method: 'POST', body: { enrollmentId: eid, bundle: 'human+18', keyId: keys['human+18'].keyId, blinded: [bl.blinded.toString(16)] } });
+  const token = { t: toHex(t), s: brsa.unblind(BigInt('0x' + res.signatures[0]), bl.r, pub18.n).toString(16), keyId: keys['human+18'].keyId };
+  const verify = async (k) => api('/api/ratings/verify', { method: 'POST', body: { did: k.did, token, sig: toB64u(await ed25519Sign(k.privateKey, `EMCON-RATER-v1|${k.did}|${token.t}`)) } });
+  assert.equal((await verify(asha)).verified, true);
+  assert.equal((await verify(await keyOf())).status, 409, 'token already spent');
+  const r = await lookup('shop.example.com');
+  assert.equal(r.length, 1); assert.equal(r[0].human, true);
+});
+await test('one rating per person per site (re-rating replaces it); unknown tags are dropped', async () => {
+  await api('/api/ratings', { method: 'POST', body: await rateBody(asha, 'shop.example.com', 2, ['never delivered', 'free crypto!!']) });
+  const r = await lookup('shop.example.com');
+  assert.equal(r.length, 1);
+  assert.equal(r[0].stars, 2);
+  assert.deepEqual(r[0].tags, ['never delivered']);
+  assert.equal((await api('/api/ratings?prefix=shop.example.com')).status, 400, 'lookups only accept a hash prefix');
+});
+
 console.log('\nSaaS accounts');
 // A tiny cookie jar per "browser", and the Origin header our own pages would send.
 async function acct(p, { method = 'GET', body, headers = {}, jar = me1 } = {}) {

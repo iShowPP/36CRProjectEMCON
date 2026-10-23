@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMCON Trust QR Codes</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    body { padding: 28px 16px 64px; font-size: 15px; }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .brand img { width: 28px; height: 28px; }
+    .brand b { font-size: 17px; }
+    h1 { font-size: 28px; margin-bottom: 4px; }
+    .tabs { display: flex; gap: 6px; margin: 20px 0 16px; flex-wrap: wrap; }
+    .tabs button { border-radius: 999px; min-height: 38px; padding: 7px 16px; }
+    .tabs button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+    .qrbox { display: grid; place-items: center; padding: 18px; background: #fff; border-radius: 14px; border: 1px solid var(--border); width: fit-content; margin: 12px auto; }
+    .qrbox svg { display: block; width: 280px; height: 280px; }
+    .payload { font: 11.5px/1.5 var(--mono); color: var(--text-3); overflow-wrap: anywhere; max-height: 66px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+    video, #shot { width: 100%; max-width: 520px; border-radius: 14px; background: #000; display: block; margin: 0 auto; }
+    .scan-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .result { margin-top: 16px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><img src="../icons/icon48.png" alt=""><b>EMCON</b><span class="muted">· Trust by QR code</span></div>
+    <h1>Share trust in person</h1>
+    <p class="muted" style="margin:0">Scan a friend's contact code once, face to face. After that, their "I vouch for this site" or "this is a scam" codes count in your checks. No server in the middle, and strangers can't vote.</p>
+
+    <div class="tabs" role="tablist">
+      <button data-tab="contact" class="on">My contact code</button>
+      <button data-tab="vouch">Vouch for a site</button>
+      <button data-tab="scan">Scan a code</button>
+      <button data-tab="list">Vouches I have</button>
+    </div>
+
+    <section id="t-contact" class="card">
+      <h2>Your contact code</h2>
+      <p class="small muted">Show this to someone you know, in person. When they scan it, they add your EMCON key to the people they trust.</p>
+      <label for="nick">Name they'll see</label>
+      <div class="row" style="flex-wrap:nowrap"><input id="nick" placeholder="e.g. Priya"><button class="primary" id="mkContact" style="flex:none">Make code</button></div>
+      <div id="contactOut"></div>
+    </section>
+
+    <section id="t-vouch" class="card hidden">
+      <h2>Vouch for a website, or warn about one</h2>
+      <p class="small muted">Only vouch for a site you have really used safely. Your friends' EMCON will count it for 90 days.</p>
+      <label for="vDomain">Website</label><input id="vDomain" placeholder="e.g. shop.example.com" class="mono">
+      <div class="two" style="margin-top:12px">
+        <button class="primary" id="mkSafe"><span data-icon="checkCircle"></span>I used it safely</button>
+        <button class="danger" id="mkScam"><span data-icon="alert"></span>It's a scam</button>
+      </div>
+      <div id="vouchOut"></div>
+    </section>
+
+    <section id="t-scan" class="card hidden">
+      <h2>Scan a friend's code</h2>
+      <p class="small muted">Point your camera at their screen, upload a photo or screenshot of the code, or paste the text under it.</p>
+      <video id="video" class="hidden" playsinline muted></video>
+      <div class="scan-tools">
+        <button class="primary" id="cam"><span data-icon="image"></span>Use camera</button>
+        <label class="btn" style="margin:0;font-size:14px;color:var(--text)"><span data-icon="download"></span>Upload an image<input type="file" id="file" accept="image/*" hidden></label>
+      </div>
+      <label for="paste">Or paste the code text</label>
+      <textarea id="paste" rows="3" class="mono" placeholder="EMCON1:…"></textarea>
+      <button id="usePaste" style="margin-top:8px">Check this code</button>
+      <div id="scanOut" class="result"></div>
+    </section>
+
+    <section id="t-list" class="hidden">
+      <div id="listOut"></div>
+    </section>
+  </div>
+  <script src="../vendor/qrcode.js"></script>
+  <script src="../vendor/jsQR.js"></script>
+  <script type="module" src="qr.js"></script>
+</body>
+</html>

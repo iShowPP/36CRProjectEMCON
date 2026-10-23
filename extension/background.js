@@ -11,6 +11,7 @@ import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
 import { normDomain, isIp, isLocal, registrable, imitation } from './lib/domains.js';
 import { lureFindings, urlsIn, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
 import { receiptDigest } from './lib/receipt.js';
+import { encodeQr, decodeQr, makeContact, makeAttestation, verifyQr } from './lib/qrtrust.js';
 import { initWatch, tabState, persist, recordPageFacts, chainReport, linkChainReport, privacyReport, markConsent, setGpc, watchHooks } from './watch.js';
 import { DEFAULT_SERVER } from './config.js';
 
@@ -440,7 +441,7 @@ async function wotAnalyze(page, sender) {
 
   // 1. Reports from people and sources you trust (includes the live phishing feed)
   let s = null;
-  try { s = scoreDomain(await domainAttestations(domain), await trustMapCached()); } catch { /* unreachable */ }
+  try { s = scoreDomain([...(await domainAttestations(domain)), ...(await qrAttestationsFor(domain))], await trustMapCached()); } catch { /* unreachable */ }
   if (!s) check('reports', 'Scam and phishing reports', 'unknown', 'The trust network could not be reached, so reports were not checked');
   else {
     const labels = (await trustMapCached()).labels;
@@ -455,6 +456,17 @@ async function wotAnalyze(page, sender) {
     if (goods.length) check('reports', 'Scam and phishing reports', 'good', `Vouched for by ${goods.length} source(s) in your web of trust: ${list([...new Set(goods.map(who))])}.${ignored}`, -Math.round(40 * Math.min(1, s.pos)));
     if (!scams.length && !goods.length) check('reports', 'Scam and phishing reports', 'clear', `No reports from the sources you follow, including the live phishing feed.${ignored}`);
   }
+
+  // 1b. Crowd ratings from verified people (small weight: crowds can be wrong, never decisive)
+  try {
+    const sum = summarise(await ratingsFor(domain), await trustMapCached(), (await wotIdentity()).did);
+    const v = sum.verified;
+    const topTags = v.tags.slice(0, 2).map(([t, n]) => `"${t}" (${n})`).join(', ');
+    if (v.count >= 3 && v.avg <= 2) check('ratings', 'Ratings from verified people', 'found', `Rated ${v.avg}/5 by ${v.count} verified people${topTags ? ': ' + topTags : ''}`, 15);
+    else if (v.count >= 3 && v.avg >= 4) check('ratings', 'Ratings from verified people', 'good', `Rated ${v.avg}/5 by ${v.count} verified people${topTags ? ': ' + topTags : ''}`, -8);
+    else if (v.count) check('ratings', 'Ratings from verified people', 'note', `${v.count} verified ${v.count === 1 ? 'person has' : 'people have'} rated it ${v.avg}/5: not enough to count yet`);
+    else check('ratings', 'Ratings from verified people', 'clear', sum.unverified ? `No verified ratings yet (${sum.unverified} unverified not counted)` : 'Nobody has rated this site yet');
+  } catch { /* ratings are optional */ }
 
   // 2. Domain age (public RDAP registry)
   if (isLocal(host)) check('age', 'Domain age (public registry)', 'na', 'Local or IP address: there is no public registration to look up');
@@ -640,6 +652,100 @@ async function wotAttest({ domain, verdict, transacted, note }) {
   return true;
 }
 
+// ---------- crowdsourced ratings ----------
+// Signed by your EMCON key. You count as a verified person after spending one humanity token
+// (needs Ghost set up); otherwise your rating is shown, but not counted in the verified score.
+async function ratingsFor(domain) {
+  const prefix = toHex(await sha256(domain)).slice(0, 5);
+  const { ratings } = await api('/api/ratings?prefix=' + prefix);
+  return ratings.filter((r) => r.domain === domain);
+}
+function summarise(list, trust, me) {
+  const verified = list.filter((r) => r.human);
+  const avg = (xs) => (xs.length ? +(xs.reduce((a, r) => a + r.stars, 0) / xs.length).toFixed(1) : null);
+  const tags = {};
+  for (const r of verified) for (const t of r.tags) tags[t] = (tags[t] || 0) + 1;
+  const network = list.filter((r) => trust.has(r.did) && r.did !== me).map((r) => ({ ...r, who: trust.labels.get(r.did) || 'someone your network trusts' }));
+  return {
+    verified: { count: verified.length, avg: avg(verified), tags: Object.entries(tags).sort((a, b) => b[1] - a[1]) },
+    unverified: list.length - verified.length,
+    network, mine: list.find((r) => r.did === me) || null,
+  };
+}
+async function rateGet({ domain }) {
+  const d = normDomain(domain);
+  const [list, trust, me] = await Promise.all([ratingsFor(d), trustMapCached(), wotIdentity()]);
+  return { domain: d, ...summarise(list, trust, me.did), tags: await api('/api/ratings/tags'), raterVerified: !!(await local.get('raterVerified')) };
+}
+async function rateSubmit({ domain, stars, tags }) {
+  const me = await wotIdentity();
+  let verified = !!(await local.get('raterVerified'));
+  if (!verified) {
+    // Spend one humanity token to prove "a real person holds this key". Without Ghost, skip.
+    const g = await local.get('ghost');
+    const bundle = g?.bundles?.find((b) => g.tokens?.[b]?.length);
+    if (bundle) {
+      const token = g.tokens[bundle].shift();
+      await local.set('ghost', g);
+      const sig = toB64u(await ed25519Sign(me.privateKey, `EMCON-RATER-v1|${me.did}|${token.t}`));
+      await api('/api/ratings/verify', { method: 'POST', body: { did: me.did, token: { t: token.t, s: token.s, keyId: token.keyId }, sig } });
+      await local.set('raterVerified', true);
+      verified = true;
+    }
+  }
+  const d = normDomain(domain), n = Math.round(Number(stars)), t = (tags || []).slice(0, 4), iat = Date.now();
+  const sig = toB64u(await ed25519Sign(me.privateKey, `EMCON-RATE-v1|${me.did}|${d}|${n}|${t.join(',')}|${iat}`));
+  await api('/api/ratings', { method: 'POST', body: { did: me.did, domain: d, stars: n, tags: t, iat, sig } });
+  return { ...(await rateGet({ domain: d })), justVerified: verified };
+}
+
+// ---------- trust over QR codes (person to person, no server) ----------
+async function qrStore() { return (await local.get('qrAtts')) || []; }
+async function qrAttestationsFor(domain) {
+  const now = Date.now();
+  return (await qrStore()).filter((a) => a.domain === domain && a.expires > now)
+    .map((a) => ({ issuer: a.issuer, verdict: a.claim === 'safe' ? 'trusted' : 'scam', transacted: a.claim === 'safe', note: 'shared in person by QR code', issued: new Date(a.issued).toISOString() }));
+}
+async function qrContact({ nickname }) {
+  const me = await wotIdentity();
+  return { text: encodeQr(await makeContact(me, nickname)), did: me.did };
+}
+async function qrAttest({ domain, claim }) {
+  const me = await wotIdentity();
+  const p = await makeAttestation(me, domain, claim);
+  // keep my own statement too, so it counts on this browser and replaces any older one
+  await qrSave(await verifyQr(p));
+  return { text: encodeQr(p), domain: p.d, expires: p.exp * 1000 };
+}
+async function qrSave(v) {
+  const list = (await qrStore()).filter((a) => !(a.issuer === v.issuer && a.domain === v.domain && a.issued <= v.issued));
+  if (list.some((a) => a.issuer === v.issuer && a.domain === v.domain)) return false; // a newer one already exists
+  list.push({ issuer: v.issuer, domain: v.domain, claim: v.claim, issued: v.issued, expires: v.expires, nonce: v.nonce, raw: v.raw, received: Date.now() });
+  await local.set('qrAtts', list.slice(-500));
+  return true;
+}
+/** A scanned or pasted QR: contacts are returned for the user to confirm; attestations are checked and stored. */
+async function qrImport({ text }) {
+  const v = await verifyQr(decodeQr(text));
+  const me = await wotIdentity();
+  const roots = (await wotState()).roots;
+  const label = (did) => (did === me.did ? 'You' : roots.find((r) => r.did === did)?.label || null);
+  if (v.kind === 'contact') return { ...v, raw: undefined, isMe: v.did === me.did, known: label(v.did) };
+  const who = label(v.issuer);
+  // Sybil rule: only people you added yourself (in person) count. Strangers can't vote.
+  if (!who) throw new Error('This vouch is signed by someone who is not in your contacts. Scan their contact QR first, in person.');
+  const fresh = await qrSave(v);
+  trustMapCached.reset();
+  return { ...v, raw: undefined, from: who, stored: fresh };
+}
+async function qrList() {
+  const roots = (await wotState()).roots;
+  const me = (await wotIdentity()).did;
+  const now = Date.now();
+  return (await qrStore()).filter((a) => a.expires > now).sort((a, b) => b.issued - a.issued)
+    .map(({ raw, ...a }) => ({ ...a, from: a.issuer === me ? 'You' : roots.find((r) => r.did === a.issuer)?.label || 'Removed contact' }));
+}
+
 async function wotTrust({ did, weight, label, publish }) {
   pubFromDidKey(did); // throws if malformed
   const me = await wotIdentity();
@@ -772,6 +878,13 @@ const HANDLERS = {
   'wot:tab': async ({ tabId }) => (await chrome.storage.session.get('verdict_' + tabId))['verdict_' + tabId] || null,
   'prov:tab': async ({ tabId }) => { const tab = await chrome.tabs.get(tabId).catch(() => null); const t = tabImages.get(tabId); return t && tab?.url === t.url ? t.counts : {}; },
   'stats:week': weekStats,
+  'rate:get': rateGet,
+  'rate:submit': rateSubmit,
+  'qr:contact': qrContact,
+  'qr:attest': qrAttest,
+  'qr:import': qrImport,
+  'qr:list': qrList,
+  'qr:remove': async ({ issuer, domain }) => { await local.set('qrAtts', (await qrStore()).filter((a) => !(a.issuer === issuer && a.domain === domain))); trustMapCached.reset(); return qrList(); },
   'account:status': accountStatus,
   'account:pair': accountPair,
   'account:unpair': async () => { await chrome.storage.local.remove('device'); return { connected: false }; },
