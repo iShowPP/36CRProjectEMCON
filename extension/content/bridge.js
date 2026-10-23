@@ -152,7 +152,7 @@
   const LABEL = {
     verified: (r) => `Verified · ${r.issuerName}`,
     recovered: (r) => `Recovered · ${r.match.issuerName}`,
-    untrusted: () => 'Signed · unknown signer',
+    untrusted: (r) => (r.source === 'c2pa' ? 'Content Credentials · unknown signer' : 'Signed · unknown signer'),
     altered: () => 'Altered after signing',
     forged: () => 'Forged provenance',
     c2pa: (r) => (r.c2pa?.signer ? `Content Credentials · ${r.c2pa.signer}` : 'Content Credentials'),
@@ -160,13 +160,26 @@
   const BADGE_ICON = { verified: 'check', recovered: 'recover', untrusted: 'help', altered: 'xCircle', forged: 'xCircle', c2pa: 'info' };
   const TAG = { verified: ['ok', 'Verified'], recovered: ['ok', 'Recovered'], untrusted: ['warn', 'Unknown signer'], altered: ['bad', 'Altered'], forged: ['bad', 'Forged'], c2pa: ['', 'Content Credentials'] };
   const dl = (pairs) => `<dl>${pairs.filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  const step = (a) => a.replace(/^c2pa\./, '').replace(/[._]/g, ' ');
+  function c2paDetail(r, head) {
+    const c = r.c2pa;
+    const facts = dl([['Signed by', esc(c.signer)], ['Organisation', esc(c.signerOrg !== c.signer ? c.signerOrg : '')], ['Certificate from', esc(c.issuerOrg || c.issuer)], ['Made with', esc(c.generator)], ['Signed', c.signedAt ? esc(new Date(c.signedAt).toLocaleString()) : ''], ['Steps recorded', esc((c.actions || []).map(step).join(', '))]]);
+    switch (r.status) {
+      case 'verified': return `${head}<h4>Content Credentials from ${esc(r.issuerName)}</h4><p>The signature is valid, the image is exactly what was signed, and the signer's certificate chains to the official C2PA trust list.</p>${facts}`;
+      case 'untrusted': return `${head}<h4>Signed by “${esc(c.signer)}”, not a trusted signer</h4><p>The Content Credentials are intact, but the certificate is not on the C2PA trust list. Anyone can make a certificate with any name, so treat it like an unsigned image.</p>${facts}`;
+      case 'altered': return `${head}<h4>Changed after it was signed</h4><p>These Content Credentials are genuine, but the image no longer matches what ${esc(r.issuerName)} signed. Someone edited the file afterwards.</p>${facts}`;
+      case 'forged': return `${head}<h4>The Content Credentials don't verify</h4><p>${c.signature !== 'valid' ? 'The signature over the credentials fails.' : 'Part of the credentials was changed after signing.'} Don't trust what they claim.</p>${facts}`;
+      default: return `${head}<h4>${esc(c.signer ? `Signed by ${c.signer}` : 'Has Content Credentials')}</h4>${facts}<p style="font-size:13px">EMCON can't check this file's image hash yet. Full check: <a href="https://contentcredentials.org/verify" target="_blank" rel="noopener">contentcredentials.org/verify</a>.</p>`;
+    }
+  }
   function detail(r) {
     const m = r.manifest;
     const [cls, word] = TAG[r.status] || ['', r.status];
     const head = `<span class="tagp ${cls}">${ic(BADGE_ICON[r.status] || 'info', 13)}${esc(word)}</span>`;
+    if (r.source === 'c2pa') return c2paDetail(r, head);
     switch (r.status) {
       case 'verified': return `${head}<h4>Signed by ${esc(r.issuerName)}</h4><p>This photo is exactly as the publisher signed it. Their key is on your trust list.</p>${dl([['Title', esc(m.title)], ['Signed', esc(new Date(m.created).toLocaleString())]])}`;
-      case 'recovered': return `${head}<h4>Matches a photo signed by ${esc(r.match.issuerName)}</h4><p>This copy lost its label (sites usually strip it), but it looks the same as a signed original: ${64 - r.distance}/64 fingerprint points match. Strong evidence, not proof.</p>${dl([['Original', `${esc(r.match.title)} · <a href="${esc(r.match.url)}" target="_blank" rel="noopener">compare</a>`]])}`;
+      case 'recovered': return `${head}<h4>Matches a photo signed by ${esc(r.match.issuerName)}</h4><p>This copy lost its ${r.match.source === 'c2pa' ? 'Content Credentials' : 'label'} (sites usually strip it), but it looks the same as a signed original: ${64 - r.distance}/64 fingerprint points match. Strong evidence, not proof.</p>${dl([['Original', `${esc(r.match.title)} · <a href="${esc(r.match.url)}" target="_blank" rel="noopener">compare</a>`]])}`;
       case 'untrusted': return `${head}<h4>Signed by “${esc(m.issuer?.name)}”, who you don't follow</h4><p>The signature is valid, but anyone can sign their own photos. Treat it like an unsigned image.</p>`;
       case 'altered': return `${head}<h4>Changed after it was signed</h4><p>This file carries a real label from ${esc(r.issuerName || m.issuer?.name)}, but its pixels no longer match what was signed. Someone edited it.</p>${dl([['Claimed title', esc(m.title)]])}`;
       case 'forged': return `${head}<h4>The publisher signature is fake</h4><p>The file claims a publisher signature that fails verification. Someone may be impersonating a publisher.</p>`;
@@ -216,8 +229,22 @@
         if (openPop?.anchor === el) { openPop = null; return; }
         const pop = document.createElement('div');
         pop.className = 'pop';
-        pop.innerHTML = detail(r) + `<div class="acts"><button class="receipt">${ic('receipt', 16)}Save signed proof</button></div>`;
+        const canRemember = r.source === 'c2pa' && r.status === 'verified';
+        pop.innerHTML = detail(r) + `<div class="acts"><button class="receipt">${ic('receipt', 16)}Save signed proof</button>${canRemember ? `<button class="remember">${ic('recover', 16)}Recognise copies</button>` : ''}</div><p class="rmsg" style="font-size:13px;margin:8px 0 0"></p>`;
         pop.querySelector('.receipt').onclick = (e2) => { e2.stopPropagation(); send({ type: 'receipt:open', image: src }).catch(() => {}); };
+        const rem = pop.querySelector('.remember');
+        if (rem) {
+          rem.onclick = async (e2) => {
+            e2.stopPropagation();
+            rem.disabled = true;
+            const msg = pop.querySelector('.rmsg');
+            msg.textContent = 'Checking the photo on the EMCON server…';
+            try {
+              await send({ type: 'prov:remember', url: src });
+              msg.textContent = 'Saved. Copies of this photo with the credentials stripped now show “Recovered” for everyone using EMCON.';
+            } catch (err) { msg.textContent = String(err.message || err); rem.disabled = false; }
+          };
+        }
         pop.onclick = (e2) => e2.stopPropagation();
         layer.appendChild(pop);
         openPop = { el: pop, anchor: el };
@@ -254,9 +281,16 @@
   }
 
   const CARD = new Set(['card number', 'CVV', 'card expiry']);
+  const LOAD_ID = Math.random().toString(36).slice(2) + Date.now().toString(36); // this page load: the checkout alarm learns for the whole first visit
+  // Card fields hosted by a payment provider in an iframe (Stripe, Braintree, Adyen, Shopify…):
+  // the page around them is still where a skimmer injects its script or a fake card form.
+  const PAY_FRAME = /(^|\.)(stripe\.com|braintreegateway\.com|adyen\.com|razorpay\.com|checkout\.com|squarecdn\.com|shopifyinc\.com|juspay\.in|cashfree\.com|payu\.in)$/;
+  const paymentFrames = () => [...document.querySelectorAll('iframe[src]')].some((f) => {
+    try { const u = new URL(f.src, location.href); return PAY_FRAME.test(u.hostname) && /card|field|element|secure|hosted|checkout/i.test(u.pathname + ' ' + f.name + ' ' + f.title); } catch { return false; }
+  });
   function pageFacts() {
     const fields = sensitiveFields();
-    const isPayment = fields.some((f) => CARD.has(f));
+    const isPayment = fields.some((f) => CARD.has(f)) || paymentFrames();
     const pwForms = [...document.querySelectorAll('input[type=password]')].map((i) => i.form).filter(Boolean);
     const formHosts = pwForms.map((f) => { try { return new URL(f.getAttribute('action') || location.href, location.href).hostname; } catch { return ''; } });
     const promise = document.querySelector('meta[name="privacy-promise"]')?.content || '';
@@ -268,6 +302,7 @@
       formHosts,
       fields,
       payment: isPayment,
+      loadId: LOAD_ID,
       scripts: isPayment ? [...document.scripts].map((s) => s.src).filter(Boolean).slice(0, 80) : null,
       privacyPromise: promise ? promise.toLowerCase().split(/[\s,]+/).filter((t) => /^[a-z-]{3,40}$/.test(t)).slice(0, 10) : null,
     };

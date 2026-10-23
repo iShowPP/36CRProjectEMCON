@@ -96,9 +96,9 @@
   </section>
 
   <div class="strip reveal"><div class="in">
-    <div><b id="feedCount">280+</b><span>live phishing sites blocked right now</span></div>
+    <div><b id="feedCount">…</b><span>live phishing sites on today's blocklist</span></div>
     <div><b>0</b><span>messages read by EMCON, ever</span></div>
-    <div><b>9</b><span>protections in one extension</span></div>
+    <div><b>12</b><span>protections in one extension</span></div>
     <div><b>100%</b><span>of warnings come with their evidence</span></div>
   </div></div>
 
@@ -112,15 +112,15 @@
       <div class="card"><h3>You see the proof</h3><p class="muted">A red "Back to safety" page with every reason in plain words, and a signed receipt you can show your bank or the police.</p></div>
     </div>
     <div class="shots reveal">
-      <figure style="--ry:10deg"><img src="/img/popup-verdict.png" alt="EMCON popup: very likely a scam, with reasons" loading="lazy"><figcaption><b>A clear answer, with reasons</b>One status in plain words, then the evidence.</figcaption></figure>
-      <figure><img src="/img/block-page.png" alt="EMCON red block page with Back to safety" loading="lazy"><figcaption><b>Back to safety</b>Dangerous pages are stopped before you type.</figcaption></figure>
-      <figure style="--ry:-10deg"><img src="/img/popup-path.png" alt="The path to a scam page, drawn like parcel tracking" loading="lazy"><figcaption><b>How you got there</b>Message, short link, redirect, fake page.</figcaption></figure>
+      <figure style="--ry:10deg"><img src="/img/popup-verdict.png" alt="EMCON popup on a live phishing site: very likely a scam, with reasons" loading="lazy"><figcaption><b>A clear answer, with reasons</b>On a live phishing site from today's OpenPhish feed.</figcaption></figure>
+      <figure><img src="/img/block-page.png" alt="EMCON red block page on a live phishing site, with Back to safety" loading="lazy"><figcaption><b>Back to safety</b>The same site, stopped before you can type.</figcaption></figure>
+      <figure style="--ry:-10deg"><img src="/img/popup-check.png" alt="A scam SMS checked by EMCON without opening its link" loading="lazy"><figcaption><b>Check a message</b>Paste an SMS: its link is followed for you, never opened.</figcaption></figure>
     </div>
   </section>
 
   <section class="block" id="features">
     <div class="eyebrow">Features</div>
-    <h2>Nine protections. One quiet extension.</h2>
+    <h2>Twelve protections. One quiet extension.</h2>
     <p class="lead">It stays out of your way on normal sites and speaks up only with evidence.</p>
     <div class="feat reveal">
       <div class="card"><span class="fi" data-i="shield"></span><h3>Phishing & look-alikes</h3><p>Blocks copies of real login pages, typo addresses like paypa1-secure.com and sites in the live phishing feed.</p></div>
@@ -129,9 +129,12 @@
       <div class="card"><span class="fi" data-i="code"></span><h3>Checkout skimmer alarm</h3><p>Warns before card input if an unfamiliar outside domain script (Magecart) appears on a shopping checkout page.</p></div>
       <div class="card"><span class="fi" data-i="users"></span><h3>Family protection</h3><p>Connect your parents' and kids' browsers with a 6-digit code. Get alerts when scams are blocked, never their browsing.</p></div>
       <div class="card"><span class="fi" data-i="bell"></span><h3>Privacy promises</h3><p>Sends Global Privacy Control (Sec-GPC) and audits whether tracking actually stops after you click "Reject all".</p></div>
-      <div class="card"><span class="fi" data-i="image"></span><h3>Photo signing & C2PA</h3><p>Shows who signed a photo and whether pixels were edited. Domain-verified publishers can sign authentic photos.</p></div>
+      <div class="card"><span class="fi" data-i="image"></span><h3>Content Credentials on photos</h3><p>Checks a photo's C2PA signature, whether it was edited, and whether the signer is on the official trust list. Recognises copies whose credentials were stripped.</p></div>
       <div class="card"><span class="fi" data-i="ghost"></span><h3>Ghost zero-knowledge login</h3><p>Sign up and sign in using blind humanity tokens. Prove you're a real adult without email, password, or phone.</p></div>
       <div class="card"><span class="fi" data-i="key"></span><h3>Signed evidence receipts</h3><p>Export cryptographic, timestamped receipts of any check or warning that anyone can independently verify.</p></div>
+      <div class="card"><span class="fi" data-i="eye"></span><h3>Anti-fingerprinting</h3><p>Adds invisible noise to canvas, audio and graphics readouts before any page script runs, so sites can't recognise your device across visits.</p></div>
+      <div class="card"><span class="fi" data-i="qr"></span><h3>Trust by QR code</h3><p>Swap QR codes with people you know once. From then on, their signed vouches and scam reports count for you; strangers' don't.</p></div>
+      <div class="card"><span class="fi" data-i="star"></span><h3>Ratings from real people</h3><p>Star ratings signed by each person's key, counted only from verified people. Lookups send a hash prefix, not the site you're on.</p></div>
     </div>
   </section>
 
@@ -151,6 +154,7 @@
         <tr><td>Audits privacy promises & cookie rejection</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
         <tr><td>Zero-knowledge Ghost sign-in</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
         <tr><td>Never reads your private messages</td><td class="us y">✓</td><td class="y">✓</td><td class="n">–</td><td class="y">✓</td></tr>
+        <tr><td>Validates Content Credentials (C2PA) on photos</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
         <tr><td>Signed cryptographic proof you can share</td><td class="us y">✓</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
       </tbody>
     </table></div>
@@ -180,17 +184,17 @@
       <div class="plan-card"><h3>Business</h3><div class="price" data-m="2999" data-y="29990">₹2,999<small> / month</small></div><div class="small muted">API, team browsers, evidence</div>
         <ul><li>Everything in Family</li><li>100 team browsers</li><li>20,000 API checks a day</li><li>Publisher photo signing keys</li><li>Signed receipts for incidents</li></ul><a class="btn" href="/signup?plan=business">Start with Business</a></div>
     </div>
-    <p class="small muted" style="margin-top:14px">Prices in Indian rupees, including GST. This is a hackathon build: paid plans run in demo mode with no charge.</p>
+    <p class="small muted" style="margin-top:14px">Prices in Indian rupees, including GST. Online card payment isn't switched on yet: until it is, paid plans are free to use.</p>
   </section>
 
   <section class="block" id="faq" style="max-width:840px">
     <div class="eyebrow">Questions</div>
     <h2>Good questions to ask a security product.</h2>
     <details class="faq"><summary>Does EMCON read my messages or browsing history?</summary><p>No. Messages you paste stay on your computer; only the link is sent to be followed. Phishing lookups send a 5-character hash prefix, not the address. Family dashboards show counts, never sites.</p></details>
-    <details class="faq"><summary>What is the payment brake and how does it protect my family?</summary><p>When you or a connected family member visits a payment page asking for card, OTP, PIN or bank details that EMCON flags, EMCON enforces a mandatory 5-minute cooling-off period to break scam urgency. The user can also click "Ask family member to check it"; the request appears instantly on your dashboard with EMCON's evidence, letting you approve or stop the payment.</p></details>
-    <details class="faq"><summary>How does the checkout script skimmer (Magecart) alarm work?</summary><p>On your first visit to any checkout or payment page, EMCON records the scripts loaded. If an unauthorized third-party script domain is subsequently injected into the page, EMCON alerts you before you enter card details, protecting you from credit card skimming attacks.</p></details>
+    <details class="faq"><summary>What is the payment brake and how does it protect my family?</summary><p>When you or a connected family member visits a payment page asking for card, OTP, PIN or bank details that EMCON flags, EMCON enforces a mandatory 5-minute cooling-off period to break scam urgency. The page also offers "Ask &lt;your name&gt; to check it": the request appears on your dashboard within seconds with EMCON's evidence, and you approve it or stop the payment.</p></details>
+    <details class="faq"><summary>How does the checkout script skimmer (Magecart) alarm work?</summary><p>On your first visit to a payment page (card fields in the page, or a Stripe, Braintree, Adyen or Razorpay card frame), EMCON records every script it loads. If a script from a new outside domain shows up on a later visit, EMCON warns you before you type card details: that is how "Magecart" skimmers steal cards from genuine shops. New scripts from the shop itself or from known ad and analytics services are noted, not alarmed.</p></details>
     <details class="faq"><summary>How is this different from AI scam detectors?</summary><p>AI detectors give a score you have to trust. EMCON shows every check: who reported a site, which brand it copies, which redirects you passed through. You can verify each one yourself.</p></details>
-    <details class="faq"><summary>How does publisher photo signing work?</summary><p>Newsrooms and publishers verify domain ownership by placing a small verification token at <code>/.well-known/emcon-publisher.txt</code> or via a DNS TXT record. Once verified, photos signed in the dashboard display as "Verified · [domain]" to all EMCON users. If someone strips metadata, EMCON's visual fingerprint matching recovers the provenance.</p></details>
+    <details class="faq"><summary>How does EMCON check photos?</summary><p>Photos from cameras and apps that support Content Credentials (C2PA), such as Truepic, Leica, Nikon and Adobe, carry a signed record. EMCON checks the signature, every recorded step and the image hash, and whether the signer's certificate chains to the official C2PA trust list. Publishers can also prove they own their website (a file at <code>/.well-known/emcon-publisher.txt</code> or a DNS TXT record) and sign photos in the dashboard. When a site strips the credentials, EMCON can still recognise the photo by its visual fingerprint. Photos without credentials get no label: missing provenance proves nothing.</p></details>
     <details class="faq"><summary>What if EMCON gets it wrong?</summary><p>Every warning lists its reasons, so a mistake is easy to spot. You can continue anyway, and vouch for a site you trust; your vouch counts for people who trust you.</p></details>
     <details class="faq"><summary>What happens if I forget my password?</summary><p>Use the recovery key you saved at sign-up. Nobody at EMCON can reset your account, so nobody can be tricked into handing it over.</p></details>
     <details class="faq"><summary>Which browsers does it work in?</summary><p>Chrome, Edge and Brave on Windows, Mac and Linux. Mobile protection is on the roadmap.</p></details>

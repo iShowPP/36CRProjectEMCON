@@ -3,10 +3,11 @@
 // The manifest binds a publisher's Ed25519 signature to a hash of the image's
 // *pixel-defining* bytes, so metadata can change but any pixel edit is detected.
 // It also carries a perceptual hash (soft binding) so provenance can be recovered
-// from a registry after a platform strips metadata. Real C2PA manifests (JUMBF)
-// are detected and reported, not verified here.
+// from a registry after a platform strips metadata. Real C2PA manifests (Content
+// Credentials) are validated by ./c2pa.js and reported with the same statuses.
 
 import { te, td, concat, sha256, toB64u, fromB64u, canonicalJson, ed25519Sign, ed25519Verify } from './util.js';
+import { validateC2pa } from './c2pa.js';
 
 const PNG_SIG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const PNG_KEYWORD = 'emcon-provenance';
@@ -199,6 +200,17 @@ export function c2paSummary(b) {
   return out;
 }
 
+async function c2paStatus(b, format, trust) {
+  let v = null;
+  try { v = await validateC2pa(b, trust); } catch { /* unreadable: report what can be read */ }
+  if (!v || v.error) return { status: 'c2pa', format, c2pa: c2paSummary(b) };
+  const base = { format, source: 'c2pa', c2pa: v, issuerName: v.signerOrg || v.signer, trusted: v.trust !== 'unknown', trustListLoaded: !!trust };
+  if (v.signature !== 'valid' || v.assertions !== 'valid') return { ...base, status: 'forged' };
+  if (v.binding === 'mismatch') return { ...base, status: 'altered' };
+  if (v.binding !== 'valid') return { ...base, status: 'c2pa' };
+  return { ...base, status: base.trusted ? 'verified' : 'untrusted' };
+}
+
 export async function signManifest(fields, privateKey) {
   return { ...fields, sig: toB64u(await ed25519Sign(privateKey, canonicalJson(fields))) };
 }
@@ -209,13 +221,16 @@ export async function signManifest(fields, privateKey) {
  *   untrusted  valid signature, but from a key nobody vouches for
  *   altered    signature valid, pixels changed after signing
  *   forged     manifest present but signature does not verify
- *   c2pa       a real C2PA manifest is present (verify with a full C2PA validator)
+ *   c2pa       Content Credentials whose binding EMCON cannot check (e.g. box hashes)
  *   none       no provenance information at all
+ * Content Credentials map onto the same statuses (source: 'c2pa'), trusted when the signer
+ * chains to an anchor of the official C2PA trust lists (c2paTrust, see ./c2pa.js).
  */
-export async function verifyImageBytes(b, trustList = []) {
+export async function verifyImageBytes(b, trustList = [], c2paTrust) {
   const { format, manifest, c2pa } = extractManifest(b);
   if (!format) return { status: 'unsupported' };
-  if (!manifest) return c2pa ? { status: 'c2pa', format, c2pa: c2paSummary(b) } : { status: 'none', format };
+  if (!manifest && c2pa) return c2paStatus(b, format, c2paTrust);
+  if (!manifest) return { status: 'none', format };
   const { sig, ...fields } = manifest;
   const trusted = trustList.find((k) => k.keyId === fields.issuer?.keyId && !k.revoked);
   // A manifest that names a trusted keyId is checked against the trust-list key,

@@ -482,7 +482,7 @@ export async function verdictFor(link, message = '') {
   let risk = 0;
   const add = (id, text, pts) => { reasons.push({ id, text, points: pts }); risk += pts; };
   const reports = (db.wot?.attestations || []).filter((a) => a.domain === host && a.verdict === 'scam');
-  if (reports.length) add('reports', `Reported as a scam: ${reports[0].note || 'listed by a security source'}`, 70);
+  if (reports.length) add('reports', `Reported as a scam: ${reports[0].vc?.credentialSubject?.note || 'listed by a security source'}`, 70);
   const brands = REAL_BRANDS.filter((b) => !b.domains.some((d) => host === d || host.endsWith('.' + d)));
   for (const b of brands) { const im = imitation(host, b); if (im) { add('lookalike', `The address ${im.text}, but it is not an official ${b.name} domain`, im.strong ? 45 : 25); break; } }
   const shorteners = exp.hops.map((h) => normDomain(new URL(h.url).hostname)).filter((h) => SHORTENERS.has(h));

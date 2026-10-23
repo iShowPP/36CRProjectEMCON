@@ -2,7 +2,7 @@
 
 **One browser extension + one tiny server that protect people from phishing, scam chains, fake media, broken privacy promises, payment scams and tracking, using cryptography and deterministic checks instead of probabilistic AI detectors. Every conclusion comes with the evidence behind it, and you can export that evidence as a signed receipt.**
 
-**Live demo: https://emcon-e2tu.onrender.com** (free hosting, so the first visit after a quiet spell takes ~50 s to wake up)
+**Live: https://emcon-e2tu.onrender.com** (free hosting, so the first visit after a quiet spell takes ~50 s to wake up). **Every feature on real websites: [/real.html](https://emcon-e2tu.onrender.com/real.html).**
 
 AI detectors fail in two directions: they flag real content, and attackers learn to slip past them. EMCON asks questions that have provable answers:
 
@@ -12,10 +12,12 @@ AI detectors fail in two directions: they flag real content, and attackers learn
 | **Scam chain detector** | "Is this one URL bad?" | "Did prize or threat wording, redirects and an unofficial site all lead to a form asking for my card and OTP?" | `webNavigation` + `webRequest` redirect tracking, quoted lure phrases, sensitive-field detection |
 | **Privacy promise monitor** | "Does the privacy policy sound nice?" | "Which third parties did the page actually contact, and did tracking stop after I said no?" | Per-tab request log, page-side feature monitor, `<meta name="privacy-promise">`, legal baseline |
 | **Evidence receipts** | "Trust our 82% risk score." | "Here is every check: found, clear, unknown or not applicable. Signed and timestamped." | VC signed by your did:key + server timestamp over the digest |
-| **Provenance** | "Is this image AI-generated?" | "Who signed it, and has it changed since?" | Ed25519 manifests in PNG/JPEG (C2PA-lite), perceptual-hash soft binding |
+| **Provenance** | "Is this image AI-generated?" | "Who signed it, has it changed since, and is the signer on the C2PA trust list?" | Content Credentials (C2PA) validation: COSE signature, assertion hashes, data hash, X.509 chain to the official trust anchors; publisher signing; perceptual-hash soft binding |
 | **Ghost sign-in** | "Who is this user?" | "Can they *prove* they're a verified adult, without revealing who they are?" | RSA blind signatures (RFC 9474-style), per-site Ed25519 keys, WebAuthn. Runs on EMCON's own login without email or password |
-| **Payment brake on real sites** | "Does this payment look fraudulent?" | "Has it waited out a cooling-off pause and passed family approval?" | Real-time family approval via EMCON dashboard, 5-minute cooling off pause on flagged payment pages |
+| **Payment brake** | "Does this payment look fraudulent?" | "Has it waited out a cooling-off pause and passed family approval?" | Real-time family approval via EMCON dashboard, 5-minute cooling off pause on flagged payment pages |
 | **Anti-fingerprinting** | (nothing) | "Can a tracker recognise this device on the next visit?" | Secret per-visit noise applied before any page script, bucketed hardware values, Global Privacy Control |
+| **Checkout alarm** | "Is this shop reputable?" | "Has a new outside script appeared on this payment page since my first visit?" | Trust-on-first-use script inventory per payment page, content fingerprints |
+| **Trust by QR code & ratings** | "What do anonymous reviews say?" | "What do people I actually know, and verified people, say?" | Signed QR vouches between contacts, ratings counted only after one blind humanity token |
 
 ---
 
@@ -36,7 +38,7 @@ The same zip is what you'd upload to the Chrome Web Store.
 
 ## Works on real websites
 
-EMCON protects the whole web, not just the demo pages. **Step-by-step guide for every shield on real sites: [emcon-e2tu.onrender.com/real.html](https://emcon-e2tu.onrender.com/real.html)** (also `/real.html` on your own server).
+Everything below runs on websites we don't control. **Step-by-step guide for every feature on real sites: [emcon-e2tu.onrender.com/real.html](https://emcon-e2tu.onrender.com/real.html)** (also `/real.html` on your own server), and `npm run test:real` checks all of it automatically against the live internet.
 
 | On real sites | How |
 |---|---|
@@ -46,8 +48,9 @@ EMCON protects the whole web, not just the demo pages. **Step-by-step guide for 
 | **Check a link** | Paste a link or a whole SMS into the popup. The server follows its redirects (HTTP 3xx and `<meta refresh>`) so your browser never opens it, then the usual checks run on where it lands. Tested with live OpenPhish sites (risk 93, "very likely a scam") and real short links (`aka.ms`, `bit.ly`, `wa.me`: no warning). Some sites answer data-centre addresses differently (YouTube shows Google's "unusual traffic" page), and EMCON reports where the link went for the server. |
 | **Anti-fingerprinting** | Registered to run before any page script, so [browserleaks.com/canvas](https://browserleaks.com/canvas) shows a new signature on every visit, and your real, stable one when you turn protection off for the site. [browserleaks.com/webgl](https://browserleaks.com/webgl) sees a common GPU. |
 | **Privacy promises** | Most sites outside Europe never show a cookie banner, so EMCON sends **Global Privacy Control** (`Sec-GPC: 1` and `navigator.globalPrivacyControl`), a "do not sell or share" signal the site receives, then checks whether trackers still load. In our tests Times of India, CNN, Forbes and Wired loaded 43–48 tracking domains each despite it. |
-| **Real Content Credentials** | Photos carrying C2PA manifests get a badge with the signer, issuer and timestamp authority read from the file, e.g. the [c2pa-rs sample](https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/CA.jpg). |
-| **Signed photos on other hosts** | [docs/media](docs/media) holds a photo signed by the live server's newsroom key and an edited copy. On GitHub they verify as *Verified* and *Altered*; re-encoded by the images.weserv.nl CDN (signature stripped) the copy is *Recovered* from its visual fingerprint. |
+| **Content Credentials (C2PA)** | EMCON validates real C2PA files: the claim signature, every assertion, the image hash and the signer's certificate chain against the trust lists the official verifier uses. On the C2PA standards body's [public test files](https://github.com/c2pa-org/public-testfiles/tree/main/legacy/1.4/image) it gives the official verifier's verdicts: Truepic's camera capture is *Verified · Truepic*, the C2PA test certificate is *unknown signer*, the edited copy is *Altered after signing*, the broken signature and the tampered assertion are *Forged*. Click *Recognise copies* on a verified photo and the server re-checks it and keeps its visual fingerprint: the same photo resized by the public images.weserv.nl CDN (credentials stripped) then shows *Recovered · Truepic*. |
+| **Checkout alarm** | On a real card form ([W3Schools' checkout form](https://www.w3schools.com/howto/howto_css_checkout_form.asp), or [EFF's donation page](https://supporters.eff.org/donate/join-eff-4) with Stripe's card field) the first visit is recorded and a return visit stays quiet; a script injected from a new domain raises the alarm before you type. |
+| **Payment brake** | Live phishing pages that ask for card, OTP, PIN or bank details get a 5-minute pause and an "ask your family" button on the block page. |
 
 Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, PayPal, SBI, HDFC NetBanking, Instagram login): none of them triggers a warning.
 
@@ -56,7 +59,7 @@ Checked against real sites (Google, GitHub, Amazon, Wikipedia, Hacker News, PayP
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/iShowPP/36CRProjectEMCON)
 
 1. Click the button, sign in to Render (free), and click **Apply**. `render.yaml` sets everything up, including a generated `EMCON_SECRET`.
-2. After about a minute you have `https://emcon-xxxx.onrender.com`. Open it: that's the hosted demo hub.
+2. After about a minute you have `https://emcon-xxxx.onrender.com` and a free Postgres database (`emcon-db`) for accounts and settings. Open it: that's your EMCON site.
 3. Build the zip for users with your address baked in:
    ```bash
    npm run pack -- --server=https://emcon-xxxx.onrender.com
@@ -80,7 +83,7 @@ Anywhere else: `docker build -t emcon . && docker run -p 8787:8787 -e EMCON_SECR
 Requires **Node 22+** and **Chrome, Edge or Brave**.
 
 ```bash
-npm install            # installs pg driver for persistence
+npm install            # pg (Postgres) and jpeg-js (photo fingerprints on the server)
 npm start              # starts server on :8787
 ```
 
@@ -92,23 +95,25 @@ Load the extension into your browser:
 ### Tests
 
 ```bash
-npm test               # 60 API tests against the live server
+npm test               # 67 API tests: every server feature, C2PA validation, accounts, family, API
 npm run test:browser   # 32 tests that load the real extension into headless Chrome: install flow, every protection, scam chain, link check, GPC, privacy promises, receipts, Magecart alarms
-npm run test:all       # both
+npm run test:prod      # the server as deployed: no test site, no demo APIs, no made-up brands
+npm run test:all       # all three
+npm run test:real      # needs internet: every feature on real websites (OpenPhish, C2PA files, Times of India, browserleaks, W3Schools, EFF, live phishing pages)
 ```
 
-Set `HEADED=1` to watch the browser test, or `EMCON_BROWSER=<path to browser exe>` to pick a browser.
+Set `HEADED=1` to watch the browser tests, or `EMCON_BROWSER=<path to browser exe>` to pick a browser. The browser and API tests use a made-up test site (`test/site`, served only with `EMCON_DEMO_SITE=1`) so every case is guaranteed to appear; `test:real` and `node tools/real-screens.mjs` (the product screenshots) use only real websites. Phishing pages open in a throwaway headless profile with downloads blocked, and nothing is typed into them.
 
 ## Checkout script-change alarm (Magecart)
 
 Card skimmers ("Magecart") are scripts slipped into a real shop's payment page, often injected after it loads, that copy card details as you type. Few consumer tools watch for them.
 
-- **Trust on first use.** The first time you see a payment page (one that asks for card number, CVV or expiry), EMCON records its scripts and a fingerprint of each one's content.
+- **Trust on first use.** The first time you see a payment page (card number, CVV or expiry fields, or a Stripe, Braintree, Adyen, Razorpay or Shopify card frame), EMCON records its scripts and a fingerprint of each one's content. Everything the page loads during that first visit, including ad and tag-manager scripts that arrive late, is the baseline.
 - **Alarm.** On later visits, a script from a **new outside domain** raises an amber warning before you type, and again when you click into a card field: *"A script from cdn-x.com appeared on this payment page since your visit on 23 Oct… Don't enter card details unless you know why it changed."* Scripts injected after load are caught too.
-- **Low noise.** Sites redeploy and ad scripts update constantly, so content changes, renamed bundles (`app.3f2a.js`) and new files from domains the page already used are shown as notes, not warnings.
+- **Low noise.** Sites redeploy and ad scripts update constantly, so content changes, renamed bundles (`app.3f2a.js`), new files from domains the page already used and new scripts from known ad or analytics services are shown as notes, not warnings.
 - **Reputation doesn't cancel it.** Magecart hits reputable shops, so a good reputation never outweighs this alarm.
 - **Trust this change** accepts a legitimate change for that page.
-- Test fixture: in test mode (`EMCON_DEMO_SITE=1`), open `/checkout.html`, then `/checkout.html?compromised=1` (a harmless script from another domain is injected after load).
+- **On a real site:** open [W3Schools' checkout form](https://www.w3schools.com/howto/howto_css_checkout_form.asp), close it, open it again (quiet), then add a script from another domain in the DevTools console, as a skimmer would. The alarm appears before you type.
 
 ## Trust by QR code, and community ratings
 
@@ -118,7 +123,7 @@ Card skimmers ("Magecart") are scripts slipped into a real shop's payment page, 
 
 ## The product site (SaaS)
 
-`/` is a full SaaS product site with accounts, subscriptions, family protection, link checking API, publisher photo signing, and real-time payment approvals. The real-internet interactive guide is at [/real.html](/real.html). Automated test fixtures live in `test/site/` (never served on the live product site).
+`/` is the SaaS product site: accounts, plans, family protection, a link-check API, publisher photo signing and real-time payment approvals. The real-internet guide is at [/real.html](/real.html). Test fixtures live in `test/site/` and are never served by the product.
 
 | Page | What it does |
 |---|---|
@@ -133,26 +138,25 @@ Connected browsers report **weekly counts only** (pages checked, scams blocked�
 
 **API:** `POST /api/v1/check` with `Authorization: Bearer emk_live_…` and `{"text": "<message or link>"}` returns `verdict` (scam / suspicious / no_warnings), `risk`, `final`, `hops` and `reasons`. Daily limits by plan: Free 50, Family 500, Business 20,000.
 
-**Billing is a demo.** Plans (Free ₹0, Family ₹149/month, Business ₹2,999/month) switch instantly and record a "demo (no charge)" invoice. Taking real payments needs a Razorpay or Stripe account in the owner's name.
+**Card payments aren't switched on yet.** Plans (Free ₹0, Family ₹149/month, Business ₹2,999/month) switch instantly and their limits apply, with a ₹0 invoice. Charging cards needs a Razorpay or Stripe merchant account in the owner's name; the plan switch is where its checkout goes.
 
 ## Design
 
 The interface was rebuilt from a study of the five closest consumer products (Malwarebytes Browser Guard, Ghostery, Bitdefender Web Sage / Scamio, DuckDuckGo, Norton 360 / Genie) plus Chrome's Safe Browsing page and Truecaller: one status said three ways (icon, colour, plain word), advice before evidence, the path drawn like parcel tracking, scam phrases highlighted in your message, a red *Back to safety* page, and nothing smaller than 12 px. The study, our users and the rules we adopted: [docs/ui-research.md](docs/ui-research.md).
 
-## 5-minute judge demo
+## 5-minute walkthrough on real websites
 
-These use the demo pages, where every case is guaranteed to appear. For the same shields on real websites, follow [/real.html](https://emcon-e2tu.onrender.com/real.html).
+Install the extension from the latest release (it points at the live server), then:
 
-1. **Ghost sign-in.** Open `localhost:8787/rp.html` → *Continue with EMCON Ghost* → approve. ShopNorth creates an 18+ account knowing **no email, name or phone**. Then open `127.0.0.1:8787/rp.html` (playing a *different company*) and sign in again: you get a **different, unlinkable pseudonym**.
-2. **Fake media.** Open `/sign.html` → *Generate a sample photo* → *Build the full demo feed* → open `/feed.html`. Labels: *Verified* original, *Altered after signing* on the doctored copy that carries the real signature, *Recovered* for the stripped re-upload, *Signed · unknown signer*. The unsigned photo gets **no** label. Click a label → *Save signed proof*.
-3. **Phishing clone.** Open `127.0.0.1:8787/phish-login.html` and EMCON puts up a full-page block. Its reasons: structural match to Kestrel Bank's login (clone distance 0/64) on a non-official domain, a credential form on a raw IP, and a scam report from a security group in your web of trust. The real `localhost:8787/bank-login.html` stays clean.
-4. **Pig-butchering payment.** On `/vault.html` log in with PIN `1234`. Send $2,500 to *CryptoYield Pro*: it's held for guardians, because the payee is new **and** its website is flagged in the web of trust. Open a guardian console from *Demo controls* and veto it. The money comes back.
-5. **Scam-script check-in.** Send $800 to the landlord → cooling-off. Answer **Yes** to "were you told to keep it secret?" and the payment escalates to guardians, who see your answers.
-6. **Duress.** Log out and log in with PIN `9999`. Send money: it *looks* successful and the balance drops. Log in again with `1234` (or open a guardian console): the money is in the freeze vault and guardians got a duress alert. Two guardians close the episode and the money returns.
-7. **Thief disables protections first.** In settings, try raising the instant limit. It's **time-locked for 24 h** and guardians are notified. Lowering it applies instantly.
-8. **Scam chain.** Open `/sms.html` and tap the link in the "prize" SMS. It redirects twice (`/s/qk50` → `/r`) to a QuickKart "claim" page asking for card number, CVV and OTP. EMCON blocks it, and the block page lists every stage: prize wording → 2 redirects → QuickKart's name on an unofficial site → card and OTP fields, plus the exact path.
-9. **Privacy promise.** Open `/news.html`. The page declares *no third-party tracking* and *respects consent*. Click **Reject all**, then the EMCON icon → **Privacy**: both promises are **broken**, with the tracker domain contacted after you said no and the canvas fingerprinting that followed.
-10. **Evidence receipt.** On the blocked claim page, click the EMCON icon → **Save signed proof of this check**. Download it, open `/verify.html` and drop the file in: *signature valid, timestamped by this server*. Change one character and verify again: *altered or forged*.
+1. **Scam SMS.** On [/real.html](https://emcon-e2tu.onrender.com/real.html), copy the test message: a KYC threat with a link that is in the live OpenPhish feed right now. EMCON icon → *Check message* → paste → *Check safely*: **Very likely a scam**, with the feed report, the threat wording and where the link really goes. Your browser never opens it.
+2. **Real logins stay quiet.** [paypal.com/signin](https://www.paypal.com/signin), [SBI](https://www.onlinesbi.sbi.bank.in/), [accounts.google.com](https://accounts.google.com/): no warning.
+3. **Photos.** Open the [Truepic photo](https://github.com/c2pa-org/public-testfiles/blob/main/legacy/1.4/image/jpeg/truepic-20230212-camera.jpg): *Verified · Truepic*. The [edited one](https://github.com/c2pa-org/public-testfiles/blob/main/legacy/1.4/image/jpeg/adobe-20220124-XCA.jpg): *Altered after signing*. On the Truepic label click *Recognise copies*, then open the [CDN copy](https://images.weserv.nl/?url=raw.githubusercontent.com/c2pa-org/public-testfiles/main/legacy/1.4/image/jpeg/truepic-20230212-camera.jpg&w=1200&output=jpg): *Recovered · Truepic*.
+4. **Privacy.** Open [timesofindia.indiatimes.com](https://timesofindia.indiatimes.com/) → EMCON → *Privacy*: dozens of tracking domains despite your Global Privacy Control signal, each named.
+5. **Fingerprinting.** [browserleaks.com/canvas](https://browserleaks.com/canvas): a new signature on every reload.
+6. **Checkout alarm.** [W3Schools' checkout form](https://www.w3schools.com/howto/howto_css_checkout_form.asp): open, close, open again, then inject a script from the console (the line is on /real.html). Amber alarm before you type.
+7. **Family and the payment brake.** Sign up, *Browsers & family* → *Connect a browser*, type the code into a second browser's EMCON settings. A live phishing page that asks for card or OTP details shows *Continue in 5:00* and *Ask … to check it*; the request appears under *Waiting for you*.
+8. **Ghost.** EMCON → More → Ghost sign-in → *Set up Ghost*, then [/login](https://emcon-e2tu.onrender.com/login) → *Continue with EMCON Ghost*: an account with no email or password.
+9. **Receipts.** Anywhere above, *Save signed proof*, then [/verify.html](https://emcon-e2tu.onrender.com/verify.html): valid; change one character: not genuine.
 
 ---
 
@@ -178,11 +182,16 @@ These use the demo pages, where every case is guaranteed to appear. For the same
 | Copy a real manifest onto an edited image. | The signature covers a hash of the **pixel-defining bytes** (PNG critical chunks / JPEG non-APPn segments), so pixel edits show as **✖ Altered**. |
 | Anyone can sign anything. | Only keys on the **trust list** earn ✔ Verified. Others show "Signed, unknown signer". A manifest claiming a trusted keyId is checked against the trust-list key, never the key it carries. |
 | Perceptual-hash collisions could borrow legitimacy. | A recovered match is labelled as *evidence, not proof*, with a link to the original image so people can compare it with their own eyes. |
-| Real C2PA files exist in the wild. | C2PA (JUMBF) manifests are **detected** and the badge links to a full C2PA validator. |
+| Real C2PA files exist in the wild. | EMCON **validates** them (`extension/lib/c2pa.js`): the COSE signature, every assertion hash, the data hash over the file, and the certificate chain to the official trust anchors. Same verdicts as the official verifier on the C2PA public test files. |
+| A self-signed certificate can claim any name ("Reuters"). | Only a chain to the C2PA trust anchors (or a certificate on the known-signer list) earns *Verified*. Anything else is *unknown signer*. |
+| A client could plant a fake fingerprint for a trusted photo. | *Recognise copies* sends only the address; the server downloads the file, re-validates it, requires a trusted signer and computes the fingerprint itself. |
 
-### 🏦 3. Honey-Vault
+### 🏦 3. Payment brake (and the Honey-Vault engine for banks)
+On real websites EMCON can't hold money, so it slows the moment of payment instead: a scam page that asks for card, OTP, PIN or bank details gets a 5-minute pause (it survives a reload) and an *Ask … to check it* button that puts the request, with EMCON's reasons, on the account owner's dashboard. The Honey-Vault engine below (`server/vault.js`) is the design for a bank that adopts EMCON; it runs only in test mode, because EMCON is not a bank.
+
 | Loophole | Fix |
 |---|---|
+| Scammers tell victims to hurry. | The brake can't be skipped for 5 minutes, and a family member can be asked with one tap. |
 | A flat 15-minute lock: scammers just tell victims to wait. | The delay **scales with risk** (new payee, amount, velocity, flagged website). Release also needs a **scam-script check-in**, and any *yes* escalates to guardians, who see the answers. |
 | A thief with the PIN first raises limits or removes guardians. | **Loosening** any protection is time-locked (24 h) and announced to guardians, who can veto. **Tightening** applies instantly. |
 | A stolen session cookie drains the account. | Every money movement needs **PIN step-up**, and wrong PINs lock out after 5 tries. |
@@ -247,6 +256,7 @@ extension/  (Chrome MV3, no build step)
     domains.js      registrable-domain helpers
     blindrsa.js     RSA-FDH blind signatures (BigInt, CRT)
     provenance.js   PNG/JPEG manifest embed/extract, pixel hash, verification
+    c2pa.js         Content Credentials validation: JUMBF, CBOR, COSE, X.509 chains
     vc.js           W3C VC 2.0 + Data Integrity eddsa-jcs-2022
     trustgraph.js   personal trust propagation with per-root Sybil budgets
     simhash.js      DOM-structure SimHash
@@ -255,30 +265,35 @@ extension/  (Chrome MV3, no build step)
                     pages.css + ui.js: the shared design system (see docs/ui-research.md)
   icons/            toolbar + store icons
 
-server/  (Node 22+, zero dependencies)
+server/  (Node 22+; dependencies: pg for Postgres, jpeg-js to fingerprint photos)
   link.js    "Check a link": follows redirects server-side (SSRF guard, timeouts, rate limit)
   issuer.js  blind-token issuer        rp.js     "ShopNorth" relying party
-  prov.js    signing + soft-binding    vault.js  Kestrel Bank Honey-Vault engine
+  prov.js    publisher signing, C2PA trust lists, soft-binding registry
+  imagehash.js  the extension's photo fingerprint, computed from the file
+  accounts.js   SaaS accounts, family, approvals, API keys, plans
+  ratings.js    community ratings      rp.js, vault.js: test mode only (sample site, bank engine)
   wot.js     attestation relay + brand fingerprints + live phishing feed
   timestamp.js  receipt timestamps (signs digest + time, never sees contents)
 
 web/        SaaS product pages (landing page, dashboard, login/signup, password recovery, real-internet guide, receipt verifier, legal)
 contracts/  GuardedVault.sol, the on-chain time-lock / guardian vault
-test/       e2e.mjs (60 API tests) · extension.mjs (32 real-browser tests) · fixtures/ (real C2PA sample from c2pa-rs) · site/ (test-only demo pages)
+test/       e2e.mjs (67 API tests) · extension.mjs (32 real-browser tests) · production.mjs (the deployed server) ·
+            real-internet.mjs (live websites) · fixtures/ (real C2PA sample from c2pa-rs) · site/ (test-only pages)
 tools/      browser.mjs: launches Chrome/Edge with the extension loaded via the DevTools protocol
             pack.mjs: builds dist/emcon-extension-v<version>.zip · make-icons.mjs: renders the icons
+            real-screens.mjs: product screenshots, taken on real websites
 ```
 
 ## Honest limitations (say these before a judge does)
 
 - **Not audited.** This is hackathon code. `GuardedVault.sol` has not been compiled in CI or audited.
 - **Blind RSA vs zk-SNARKs:** blind signatures give unlinkability and simple, fast verification. Selective disclosure of arbitrary attributes (e.g. "lives in EU") would need BBS+ or zk circuits (Circom). That's the roadmap.
-- **Demo issuer** checks only a date of birth. Production plugs in real KYC, a bank, or a government eID.
+- **The Ghost issuer** checks only a date of birth. Production plugs in real KYC, a bank, or a government eID.
 - **Anti-fingerprinting runs as an extension.** It starts before page scripts, but Web Workers (an `OffscreenCanvas` in a worker) aren't covered, nor is a same-origin frame reached through `window[0]` before anything touches its `.contentWindow`. Determined scripts can spot that values are noised (they can't undo it). Brave-grade protection lives in the browser engine; in Brave, its own randomisation already applies.
 - **GPC is a request, not a block.** It is legally binding in California, Colorado and several other US states. Elsewhere a site may ignore it, and the privacy report shows exactly that. A tracker loading isn't proof that data was sold; the report lists what loaded, not what happened to the data.
 - **Check a link fetches the link from the EMCON server**, so the scam site sees the server's address, not yours. Sites that only show their scam to phones or to certain countries may look harmless to the server.
 - **The WebAuthn gate is a local user-presence check.** Encrypting the master secret with the passkey's PRF output is next on the roadmap.
-- **"C2PA-lite"** uses its own manifest format. It detects real C2PA but doesn't fully validate it (that needs the c2pa-rs SDK).
+- **Content Credentials:** EMCON validates the active manifest (signature, assertions, data hash, certificate chain to the trust anchors). It doesn't yet check ingredient manifests, OCSP revocation, or box/BMFF hashes (those files show *Content Credentials* without a verdict), and it reads the signing time from the timestamp token without verifying the timestamp authority's own signature. Publisher signing uses EMCON's compact manifest format, not C2PA.
 - **Registrable-domain logic** uses a small built-in suffix list rather than the full Public Suffix List.
 - **Render's free web service sleeps when idle.** With `DATABASE_URL` configured (free Render Postgres), all accounts, family devices, approvals and ratings survive restarts and redeploys. On cold start after sleeping, the free instance takes about 50 s to spin up.
 - **Scam wording lists are English-only for now** (prize, threat, fee, urgency phrases). Hindi and other languages are the obvious next step.

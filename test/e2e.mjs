@@ -353,9 +353,8 @@ await test('config: local mode exposes official + alternate origins', async () =
 });
 await test('provenance registry downloads for local matching, with absolute URLs', async () => {
   const reg = await getJson('/api/prov/registry');
-  assert.ok(Array.isArray(reg) && reg.length >= 2);
+  assert.ok(Array.isArray(reg) && reg.length >= 1);
   assert.ok(reg.some((r) => /^http:\/\/127\.0\.0\.1:\d+\/media\//.test(r.url)), 'photos signed on this server get absolute URLs');
-  assert.ok(reg.some((r) => r.url.startsWith('https://raw.githubusercontent.com/')), 'the seeded GitHub-hosted demo photo is always listed');
   for (const r of reg) assert.match(r.dhash, /^[0-9a-f]{16}$/);
 });
 
@@ -385,17 +384,69 @@ await test('demo shortener hops redirect only within the site (no open redirect)
 });
 
 console.log('\nCheck a link & real C2PA files');
-await test('a real C2PA file (c2pa-rs sample) is recognised and its signer details read', async () => {
-  const r = await prov.verifyImageBytes(new Uint8Array(fs.readFileSync(new URL('./fixtures/c2pa-CA.jpg', import.meta.url))), []);
-  assert.equal(r.status, 'c2pa');
-  assert.equal(r.c2pa.signer, 'C2PA Signer');
-  assert.equal(r.c2pa.issuer, 'Intermediate CA');
-  assert.match(r.c2pa.generator, /c2pa-rs/);
-  assert.match(r.c2pa.timestampAuthority, /DigiCert/);
+const { validateC2pa, trustFromPem } = await import('../extension/lib/c2pa.js');
+const c2paCA = new Uint8Array(fs.readFileSync(new URL('./fixtures/c2pa-CA.jpg', import.meta.url)));
+const officialTrust = trustFromPem(fs.readFileSync(new URL('../server/seed/c2pa-anchors.pem', import.meta.url), 'utf8'), fs.readFileSync(new URL('../server/seed/c2pa-allowed.sha256.txt', import.meta.url), 'utf8'));
+// flips one bit at the first occurrence of `text` after `after`
+const tamper = (b, after, text) => {
+  const buf = Buffer.from(b), at = buf.indexOf(text, buf.indexOf(after));
+  assert.ok(at > 0, `${text} not found`);
+  const c = b.slice();
+  c[at + 1] ^= 1;
+  return c;
+};
+await test('a real C2PA file (c2pa-rs sample): signature, every assertion and the image hash verify', async () => {
+  const v = await validateC2pa(c2paCA, officialTrust);
+  assert.equal(v.signature, 'valid');
+  assert.equal(v.assertions, 'valid');
+  assert.equal(v.binding, 'valid');
+  assert.equal(v.signer, 'C2PA Signer');
+  assert.equal(v.issuer, 'Intermediate CA');
+  assert.match(v.generator, /c2pa-rs/);
+  assert.match(v.timestampAuthority, /DigiCert/);
+  assert.equal(v.alg, 'PS256');
+});
+await test('its C2PA test certificate is on no trust list -> "unknown signer", never "verified"', async () => {
+  const r = await prov.verifyImageBytes(c2paCA, [], officialTrust);
+  assert.equal(r.source, 'c2pa');
+  assert.equal(r.status, 'untrusted');
+  assert.equal(r.c2pa.trust, 'unknown');
+});
+await test('a signer certificate on the known-certificate list -> verified', async () => {
+  const { certSha256 } = await validateC2pa(c2paCA);
+  const r = await prov.verifyImageBytes(c2paCA, [], { anchors: [], allowed: new Set([certSha256]) });
+  assert.equal(r.status, 'verified');
+  assert.equal(r.issuerName, 'C2PA Test Signing Cert');
+});
+await test('one changed byte of image data -> altered (hard binding mismatch)', async () => {
+  const c = c2paCA.slice();
+  c[c.length - 200] ^= 1;
+  const r = await prov.verifyImageBytes(c, [], officialTrust);
+  assert.equal(r.status, 'altered');
+  assert.equal(r.c2pa.signature, 'valid');
+});
+await test('an edited claim -> forged (the signature fails)', async () => {
+  const r = await prov.verifyImageBytes(tamper(c2paCA, 'c2pa.claim', 'make_test_images'), [], officialTrust);
+  assert.equal(r.status, 'forged');
+  assert.equal(r.c2pa.signature, 'invalid');
+});
+await test('an edited assertion -> forged (its hash no longer matches the signed claim)', async () => {
+  const r = await prov.verifyImageBytes(tamper(c2paCA, 'c2pa.assertions', 'c2pa.opened'), [], officialTrust);
+  assert.equal(r.status, 'forged');
+  assert.equal(r.c2pa.signature, 'valid');
+  assert.equal(r.c2pa.assertions, 'mismatch');
+});
+await test('the server computes the same kind of visual fingerprint from the file', async () => {
+  const { dhashOf } = await import('../server/imagehash.js');
+  const h = dhashOf(c2paCA);
+  assert.match(h, /^[0-9a-f]{16}$/);
+  // re-encoding the metadata away does not change it: strip the C2PA segment
+  assert.equal(dhashOf(prov.stripManifest(c2paCA)), h);
 });
 // A stand-in "shortener": HTTP redirect, then a page that redirects itself with <meta refresh>.
 const side = http.createServer((req, res) => {
   if (req.url === '/go') { res.writeHead(301, { location: '/meta' }); return res.end(); }
+  if (req.url === '/ca.jpg') { res.setHeader('content-type', 'image/jpeg'); return res.end(c2paCA); }
   res.setHeader('content-type', 'text/html');
   if (req.url === '/amp') return res.end('<meta http-equiv="refresh" content="0; url=/end?a=1&amp;b=2">');
   res.end(req.url === '/meta' ? '<meta http-equiv="refresh" content="0; url=/end"><p>loading</p>' : '<h1>landing page</h1>');
@@ -403,6 +454,15 @@ const side = http.createServer((req, res) => {
 await new Promise((r) => side.listen(0, '127.0.0.1', r));
 const SIDE = `http://127.0.0.1:${side.address().port}`;
 const expand = (u) => api('/api/link/expand?url=' + encodeURIComponent(u));
+await test('remembering a photo: the server re-checks it and refuses one whose signer is not trusted', async () => {
+  const r = await api('/api/prov/c2pa', { method: 'POST', body: { url: SIDE + '/ca.jpg' } });
+  assert.equal(r.status, 422);
+  assert.match(r.error, /trust list/);
+  assert.equal((await api('/api/prov/c2pa', { method: 'POST', body: { url: SIDE + '/meta' } })).status, 415);
+  const t = await api('/api/prov/c2pa-trust');
+  assert.match(t.anchors, /BEGIN CERTIFICATE/);
+  assert.ok(t.allowed.split('\n').filter((l) => l && !l.startsWith('#')).length > 50);
+});
 await test('link check follows HTTP and <meta refresh> redirects to where the link really lands', async () => {
   const r = await expand(SIDE + '/go');
   assert.deepEqual(r.hops.map((h) => [new URL(h.url).pathname, h.status, h.leaves || null]), [['/go', 301, 'redirect'], ['/meta', 200, 'page redirect'], ['/end', 200, null]]);

@@ -4,6 +4,7 @@
 import { toHex, fromHex, toB64u, randomBytes, sha256, hmacSha256, ed25519FromSeed, ed25519Sign, didKeyFromPub, pubFromDidKey, hamming } from './lib/util.js';
 import * as brsa from './lib/blindrsa.js';
 import { verifyImageBytes } from './lib/provenance.js';
+import { trustFromPem } from './lib/c2pa.js';
 import { dhash } from './lib/dhash.js';
 import { domTokens, simhash64 } from './lib/simhash.js';
 import { computeTrust, scoreDomain } from './lib/trustgraph.js';
@@ -11,6 +12,7 @@ import { signCredential, verifyCredential, VC_CONTEXT } from './lib/vc.js';
 import { normDomain, isIp, isLocal, registrable, sameSite, imitation } from './lib/domains.js';
 import { lureFindings, urlsIn, STRONG_LURE, SENSITIVE_FIELDS } from './lib/signals.js';
 import { receiptDigest } from './lib/receipt.js';
+import { trackerFor } from './lib/trackers.js';
 import { encodeQr, decodeQr, makeContact, makeAttestation, verifyQr } from './lib/qrtrust.js';
 import { initWatch, tabState, persist, recordPageFacts, chainReport, linkChainReport, privacyReport, markConsent, setGpc, watchHooks } from './watch.js';
 import { DEFAULT_SERVER } from './config.js';
@@ -289,6 +291,8 @@ chrome.tabs.onRemoved.addListener((tabId) => { lastFacts.delete(tabId); tabImage
 // =====================================================================
 const trustList = cached(10 * 60e3, () => api('/api/prov/trust-list'));
 const registry = cached(10 * 60e3, () => api('/api/prov/registry'));
+// the official Content Credentials trust lists, relayed by the EMCON server
+const c2paTrust = cached(6 * 3600e3, async () => { const t = await api('/api/prov/c2pa-trust'); return trustFromPem(t.anchors, t.allowed); });
 const provCache = new Map();
 const tabImages = new Map(); // tabId -> { url, counts: { verified: 2, … } } for the popup
 const LABELLED = new Set(['verified', 'recovered', 'untrusted', 'altered', 'forged', 'c2pa']);
@@ -302,7 +306,9 @@ function provCheck(url) {
     const bytes = new Uint8Array(await res.arrayBuffer());
     let trust = [], trustOk = true;
     try { trust = await trustList(); } catch { trustOk = false; /* offline: signatures still checked, nothing "trusted" */ }
-    let result = { ...(await verifyImageBytes(bytes, trust)), trustListLoaded: trustOk };
+    let ctrust;
+    try { ctrust = await c2paTrust(); } catch { /* offline: Content Credentials still checked, no signer trusted */ }
+    let result = { trustListLoaded: trustOk, ...(await verifyImageBytes(bytes, trust, ctrust)) };
     if (result.status === 'none' && (await settings()).provRecovery) {
       try {
         const bmp = await createImageBitmap(new Blob([bytes]));
@@ -332,6 +338,7 @@ function imageChecks(r) {
     row('Image could be inspected', 'unknown', r.status === 'unsupported' ? 'Not a PNG or JPEG file' : r.error || 'The image could not be downloaded');
     return rows;
   }
+  if (r.source === 'c2pa') return c2paChecks(r, row, rows);
   const m = r.manifest;
   if (m) {
     row('Signed provenance label in the file', 'note', `Label names publisher “${m.issuer?.name}”, title “${m.title}”, created ${m.created}`);
@@ -350,6 +357,20 @@ function imageChecks(r) {
     if (r.status === 'recovered') row('Visual match with a signed original', 'good', `Matches “${r.match.title}” by ${r.match.issuerName} (${64 - r.distance}/64 fingerprint bits): ${r.match.url}`);
     else row('Visual match with a signed original', r.registryChecked === false ? 'unknown' : 'clear', r.registryChecked === false ? 'The registry could not be checked' : 'No signed original looks like this image');
   }
+  return rows;
+}
+
+function c2paChecks(r, row, rows) {
+  const c = r.c2pa;
+  row('Content Credentials (C2PA) in the file', 'note', [c.generator && `made with ${c.generator}`, c.title && `title “${c.title}”`, c.signedAt && `signed ${new Date(c.signedAt).toISOString()}`, c.timestampAuthority && `timestamped by ${c.timestampAuthority}`].filter(Boolean).join('; ') || 'Present');
+  const by = c.signer + (c.signerOrg && c.signerOrg !== c.signer ? ` (${c.signerOrg})` : '');
+  row('Claim signature', c.signature === 'valid' ? 'good' : 'found', c.signature === 'valid' ? `Valid ${c.alg} signature by ${by}` : 'The signature does not verify: the credentials were faked or edited');
+  if (c.signature !== 'valid') return rows;
+  row('Assertions match the signed claim', c.assertions === 'valid' ? 'good' : 'found', c.assertions === 'valid' ? `All ${c.assertionLabels.length} assertions match their signed hashes` : 'An assertion was changed after signing');
+  if (c.binding === 'unsupported') row('Image unchanged since signing', 'unknown', 'This file binds its credentials with a hash type EMCON does not check yet');
+  else row('Image unchanged since signing', c.binding === 'valid' ? 'good' : 'found', c.binding === 'valid' ? 'The file hash matches the signed hash' : 'The file no longer matches the signed hash: it was edited after signing');
+  const why = (c.errors || []).find((e) => /certificate/.test(e)) || 'the certificate is not from an issuer on the list';
+  row('Signer on the Content Credentials trust list', r.trustListLoaded === false ? 'unknown' : r.trusted ? 'good' : 'found', r.trustListLoaded === false ? 'The trust list could not be loaded' : r.trusted ? `Yes: certificate from ${c.issuerOrg || c.issuer}${c.anchor ? `, chaining to ${c.anchor}` : ''}` : `No: ${why}`);
   return rows;
 }
 
@@ -489,13 +510,13 @@ async function wotAnalyze(page, sender) {
 
   // 1c. Checkout script-change alarm (payment pages only)
   if (tabId != null && page.payment && Array.isArray(page.scripts)) {
-    const c = await checkoutScripts(sender.url, page.scripts).catch(() => null);
+    const c = await checkoutScripts(sender.url, page.scripts, page.loadId).catch(() => null);
     const since = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     if (c?.status === 'first') check('scripts', 'Payment page scripts', 'note', `First visit to this payment page: EMCON recorded its ${c.count} scripts and will warn you if a new outside script appears before you pay`);
     else if (c?.status === 'alarm') {
       check('scripts', 'Payment page scripts', 'found', `A script from ${list(c.newHosts)} appeared on this payment page since your visit on ${since(c.since)}. A new outside script can read card details as you type them (a "Magecart" skimming attack). Don't enter card details unless you know why it changed.`, 30);
       strong.push('a new outside script on the payment page');
-    } else if (c?.status === 'changed') check('scripts', 'Payment page scripts', 'note', `${c.added.length ? `${c.added.length} new script(s) from domains this page already used` : ''}${c.added.length && c.changed.length ? ', and ' : ''}${c.changed.length ? `${c.changed.length} script(s) with changed content` : ''} since ${since(c.since)}. Sites update their scripts often, so this alone isn't a warning`);
+    } else if (c?.status === 'changed') check('scripts', 'Payment page scripts', 'note', `${c.newTrackers.length ? `New scripts from known ad or analytics services (${list(c.newTrackers)}); ` : ''}${c.added.length ? `${c.added.length} new script(s) from domains this page already used` : ''}${c.added.length && c.changed.length ? ', and ' : ''}${c.changed.length ? `${c.changed.length} script(s) with changed content` : ''} since ${since(c.since)}. Sites update their scripts often, so this alone isn't a warning`);
     else if (c) check('scripts', 'Payment page scripts', 'clear', `The same ${c.count} scripts as on your first visit (${since(c.since)})`);
   }
 
@@ -688,6 +709,8 @@ async function wotAttest({ domain, verdict, transacted, note }) {
 // fingerprint of each one's content. Later, a script from a NEW outside domain raises the alarm
 // before you type card details. Content changes and new first-party files are shown as notes:
 // sites redeploy and ad scripts update constantly, and crying wolf would teach people to ignore it.
+// The whole first visit is the baseline (ads and tag managers load scripts late), and a new host
+// that is a known ad or analytics service is a note: skimmers send cards to their own domains.
 const checkoutKey = (u) => { const x = new URL(u); return x.origin + x.pathname.split('/').map((p) => (/^\d+$|^[0-9a-f-]{16,}$/i.test(p) ? ':id' : p)).join('/'); };
 // app.3f2a9c1e.js and app.71b0c2d4.js are the same script after a deploy
 const scriptId = (s) => { try { const u = new URL(s); if (!/^https?:$/.test(u.protocol)) return u.protocol + 'inline'; return u.origin + u.pathname.replace(/[.-][0-9a-f]{6,}(?=[.-])/gi, '.*').replace(/\d{6,}/g, '*'); } catch { return null; } };
@@ -700,7 +723,7 @@ function scriptHash(src) {
   }
   return scriptHashes.get(src);
 }
-async function checkoutScripts(pageUrl, srcs) {
+async function checkoutScripts(pageUrl, srcs, loadId) {
   const key = checkoutKey(pageUrl);
   const site = normDomain(new URL(pageUrl).hostname);
   const items = [];
@@ -714,21 +737,27 @@ async function checkoutScripts(pageUrl, srcs) {
   const all = (await local.get('checkouts')) || {};
   const base = all[key];
   if (!base) {
-    all[key] = { first: Date.now(), visits: 1, scripts: Object.fromEntries(items.map((i) => [i.id, { host: i.host, third: i.third, hash: i.hash }])) };
+    all[key] = { first: Date.now(), firstLoad: loadId, visits: 1, scripts: Object.fromEntries(items.map((i) => [i.id, { host: i.host, third: i.third, hash: i.hash }])) };
     const keys = Object.keys(all);
     for (const k of keys.slice(0, Math.max(0, keys.length - 300))) delete all[k];
     await local.set('checkouts', all);
     return { status: 'first', count: items.length };
+  }
+  if (loadId && base.firstLoad === loadId) {
+    for (const i of items) base.scripts[i.id] ||= { host: i.host, third: i.third, hash: i.hash };
+    await local.set('checkouts', all);
+    return { status: 'first', count: Object.keys(base.scripts).length };
   }
   base.visits = (base.visits || 1) + 1;
   base.last = Date.now();
   const knownHosts = new Set(Object.values(base.scripts).map((s) => s.host));
   const added = items.filter((i) => !base.scripts[i.id]);
   const changed = items.filter((i) => base.scripts[i.id]?.hash && i.hash && base.scripts[i.id].hash !== i.hash);
-  const newHosts = [...new Set(added.filter((i) => i.third && !knownHosts.has(i.host)).map((i) => i.host))];
+  const outside = [...new Set(added.filter((i) => i.third && !knownHosts.has(i.host)).map((i) => i.host))];
+  const newHosts = outside.filter((h) => !trackerFor(h)), newTrackers = outside.filter((h) => trackerFor(h));
   base.pending = [...added, ...changed];
   await local.set('checkouts', all);
-  return { status: newHosts.length ? 'alarm' : added.length || changed.length ? 'changed' : 'same', newHosts, added, changed, count: items.length, since: base.first, visits: base.visits };
+  return { status: newHosts.length ? 'alarm' : added.length || changed.length ? 'changed' : 'same', newHosts, newTrackers, added, changed, count: items.length, since: base.first, visits: base.visits };
 }
 async function checkoutAccept({ url }) {
   const all = (await local.get('checkouts')) || {};
@@ -957,6 +986,12 @@ const HANDLERS = {
   'wot:analyze': (m, sender) => wotAnalyze(m.page, sender),
   'privacy:features': privacyFeatures,
   'privacy:consent': (m, sender) => privacyConsent({ state: m.state, how: m.how }, sender),
+  // remember a photo with trusted Content Credentials so stripped copies are recognised (the server re-checks it)
+  'prov:remember': async ({ url }) => {
+    const r = await api('/api/prov/c2pa', { method: 'POST', body: { url } });
+    registry.reset();
+    return r;
+  },
   'receipt:open': async ({ image }) => { await chrome.tabs.create({ url: chrome.runtime.getURL('pages/receipt.html?img=' + encodeURIComponent(image)) }); return true; },
   // extension pages only
   'ghost:status': ghostStatus,
@@ -1001,7 +1036,7 @@ const HANDLERS = {
     return s;
   },
 };
-const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze', 'privacy:features', 'privacy:consent', 'receipt:open', 'checkout:accept', 'brake:info', 'brake:request', 'brake:status']);
+const CONTENT_ALLOWED = new Set(['ghost:request', 'prov:check', 'wot:analyze', 'privacy:features', 'privacy:consent', 'receipt:open', 'prov:remember', 'checkout:accept', 'brake:info', 'brake:request', 'brake:status']);
 
 // First install: show the welcome page once (unpacked reloads don't repeat it).
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {

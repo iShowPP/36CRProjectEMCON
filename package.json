@@ -11,12 +11,15 @@
     "start": "node server/index.js",
     "test": "node test/e2e.mjs",
     "test:browser": "node test/extension.mjs",
-    "test:all": "node test/e2e.mjs && node test/extension.mjs",
+    "test:all": "node test/e2e.mjs && node test/extension.mjs && node test/production.mjs",
     "pack": "node tools/pack.mjs",
     "icons": "node tools/make-icons.mjs",
-    "reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\""
+    "reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\"",
+    "test:prod": "node test/production.mjs",
+    "test:real": "node test/real-internet.mjs"
   },
   "dependencies": {
+    "jpeg-js": "0.4.4",
     "pg": "8.13.1"
   }
 }
