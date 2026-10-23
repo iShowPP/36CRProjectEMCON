@@ -6,6 +6,9 @@
 // so both sides agree on photos they check independently.
 
 const K = 16;
+// a cell counts as brighter only by at least one grey level: flat areas (sky) stay 0 instead of
+// following JPEG noise
+const TIE = 1000;
 
 export async function dhash(source) {
   const c = new OffscreenCanvas(9 * K, 8 * K);
@@ -23,7 +26,7 @@ export async function dhash(source) {
   }
   let bits = 0n;
   for (let y = 0; y < 8; y++) {
-    for (let x = 0; x < 8; x++) bits = (bits << 1n) | (lum[y * 9 + x] > lum[y * 9 + x + 1] ? 1n : 0n);
+    for (let x = 0; x < 8; x++) bits = (bits << 1n) | (lum[y * 9 + x] - lum[y * 9 + x + 1] > TIE * K * K ? 1n : 0n);
   }
   return bits.toString(16).padStart(16, '0');
 }

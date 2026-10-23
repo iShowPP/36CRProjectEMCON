@@ -182,7 +182,8 @@ await test('studio builds the five-post demo feed', async () => {
 });
 await test('feed shows verified / altered / recovered / unknown-signer badges and none on the unsigned photo', async () => {
   const f = await browser.open(L + '/feed.html');
-  const ui = await waitFor(async () => { const u = await extensionUi(f); return u.badges.length >= 4 && u; }, { timeout: 25000, what: 'four badges' });
+  const ui = await waitFor(async () => { const u = await extensionUi(f); return u.badges.length >= 4 && u; }, { timeout: 25000, what: 'four badges' })
+    .catch(async (e) => { throw new Error(`${e.message}; saw: ${(await extensionUi(f)).badges.join(' | ') || 'none'}`); });
   await sleep(1500);
   const { badges } = await extensionUi(f);
   console.log('      badges:', badges.join(' | '));

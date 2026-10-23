@@ -95,6 +95,7 @@ export function dhashOf(buf) {
     }
   }
   let bits = 0n;
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits = (bits << 1n) | (lum[y * 9 + x] > lum[y * 9 + x + 1] ? 1n : 0n);
+  // brighter by at least one grey level, like the extension (flat areas stay 0)
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits = (bits << 1n) | (lum[y * 9 + x] - lum[y * 9 + x + 1] > 1000 ? 1n : 0n);
   return bits.toString(16).padStart(16, '0');
 }
